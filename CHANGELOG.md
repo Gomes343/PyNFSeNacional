@@ -18,7 +18,7 @@ versionamento [SemVer](https://semver.org/lang/pt-BR/).
 - Correção **E1229**: o XML assinado precisa do prolog `<?xml encoding="UTF-8"?>` (o SEFIN rejeita
   sem ele) — `assinar_dps` reserializa com `xml_declaration=True`.
 - `danfse.render`: DANFSe local (PDF) via `BrazilFiscalReport` ≥ 1.0 — **dependência opcional**
-  (`pip install "PyNFSeNacional[danfse]"`); o núcleo de emissão não a puxa (import lazy).
+  (`pip install "PyNFSeNacionalGT[danfse]"`); o núcleo de emissão não a puxa (import lazy).
 - `config.validar`/`validar_tomador`: portão de validação fiscal (E0312/E0712/E1235…,
   CPF/CNPJ mód-11) + loader tolerante (`ConfigError`).
 - `Certificado`: leitura do `.pfx` A1 via `cryptography` (+ fallback de cifra legada §9).

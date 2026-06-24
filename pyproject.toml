@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "PyNFSeNacional"
+name = "PyNFSeNacionalGT"
 version = "0.1.0.dev0"
 description = "Emissão de NFS-e pela API SEFIN Nacional (DPS) + geração local do DANFSe, em Python puro."
 readme = "README.md"
@@ -31,7 +31,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# DANFSe (PDF) é OPCIONAL: `pip install PyNFSeNacional[danfse]`. Mantém o núcleo de emissão
+# DANFSe (PDF) é OPCIONAL: `pip install PyNFSeNacionalGT[danfse]`. Mantém o núcleo de emissão
 # enxuto e MIT-limpo — a BrazilFiscalReport é LGPL-3.0 (LICENSE/README upstream; o classifier
 # AGPL do pyproject deles parece um engano). O import é lazy em danfse.py.
 danfse = ["brazilfiscalreport[danfse]>=1.0"]

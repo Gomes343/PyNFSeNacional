@@ -53,9 +53,9 @@
 
 ## Decisões em aberto
 
-- **Nome do pacote/repo:** `PyNFSeNacional` (definido) — dist/PyPI `PyNFSeNacional`, import `pynfsenacional`,
-  CLI `nfse-nacional`. `PyNFSeNacional` está livre no PyPI e em github.com/Gomes343/PyNFSeNacional;
-  reservar o nome no PyPI antes do primeiro release. (O nome neutro `nfse-nacional` está ocupado por terceiro.)
+- **Nome:** projeto/repo `PyNFSeNacional`; no **PyPI o pacote é `PyNFSeNacionalGT`** — `PyNFSeNacional`
+  esbarra na proteção anti-typosquatting do PyPI (semelhante a `nfse-nacional`, de terceiro). Import
+  `pynfsenacional`, CLI `nfse-nacional`. Trusted Publisher configurado (workflow `release.yml`, env `pypi`).
 - **`requests` vs `httpx`** para o mTLS; e PKCS#12 direto (`requests-pkcs12`) vs converter p/ PEM.
 - **Licença das deps:** `BrazilFiscalReport` é LGPL-3.0 (as demais, MIT). Usar como dependência
   (sem fork/edição) é compatível com um projeto MIT — documentar.

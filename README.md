@@ -8,7 +8,7 @@ Feito por um contador, para contadores e desenvolvedores que precisam emitir not
 no **padrão nacional** sem depender de robô de navegador nem da API de PDF do governo.
 
 [![CI](https://github.com/Gomes343/PyNFSeNacional/actions/workflows/ci.yml/badge.svg)](https://github.com/Gomes343/PyNFSeNacional/actions/workflows/ci.yml)
-[![PyPI](https://img.shields.io/pypi/v/PyNFSeNacional?color=blue)](https://pypi.org/project/PyNFSeNacional/)
+[![PyPI](https://img.shields.io/pypi/v/PyNFSeNacionalGT?color=blue)](https://pypi.org/project/PyNFSeNacionalGT/)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Ruff](https://img.shields.io/badge/lint-ruff-261230)](https://github.com/astral-sh/ruff)
@@ -58,14 +58,16 @@ adicionando o que faltava (o transporte ao SEFIN nacional + o acabamento).
 
 ```bash
 # núcleo: emite a NFS-e (sem gerar PDF)
-pip install PyNFSeNacional
+pip install PyNFSeNacionalGT
 
 # + geração local do DANFSe (PDF) — dependência opcional
-pip install "PyNFSeNacional[danfse]"
+pip install "PyNFSeNacionalGT[danfse]"
 ```
 
-> Requer **Python 3.10+**. (Durante o alpha, ainda não publicado no PyPI — instale do código: veja
-> [Desenvolvimento](#-desenvolvimento).)
+> Requer **Python 3.10+**. No PyPI o pacote se chama **`PyNFSeNacionalGT`** (o nome `PyNFSeNacional`
+> esbarra na proteção do PyPI por semelhança com outro projeto); o **import continua `pynfsenacional`**.
+> Durante o alpha ainda não há release publicado — para testar agora, instale do código (ver
+> [Desenvolvimento](#-desenvolvimento)).
 
 ---
 

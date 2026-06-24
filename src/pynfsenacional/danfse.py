@@ -19,13 +19,13 @@ def render(nfse_xml: str, destino: str | Path) -> str:
 
     `nfse_xml`: o XML da NFS-e devolvido pelo SEFIN (não o da DPS).
 
-    Requer o extra opcional: `pip install PyNFSeNacional[danfse]`.
+    Requer o extra opcional: `pip install PyNFSeNacionalGT[danfse]`.
     """
     try:
         from brazilfiscalreport.danfse import Danfse
     except ImportError as e:
         raise ImportError(
-            "geração do DANFSe requer o extra opcional: pip install PyNFSeNacional[danfse]"
+            "geração do DANFSe requer o extra opcional: pip install PyNFSeNacionalGT[danfse]"
         ) from e
 
     destino = Path(destino)

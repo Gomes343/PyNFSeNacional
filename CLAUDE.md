@@ -72,7 +72,7 @@ ponta a ponta: **validar → montar DPS → assinar → transporte mTLS → Nota
 SEFIN devolveu o `nNFSe` + a chave de 50 díg e o DANFSe foi gerado localmente. (No caminho, corrigido o
 **E1229**: faltava o prolog `<?xml encoding="UTF-8"?>` no XML assinado.)
 
-**DANFSe é dependência OPCIONAL** (`pip install PyNFSeNacional[danfse]`): o núcleo de emissão usa só
+**DANFSe é dependência OPCIONAL** (`pip install PyNFSeNacionalGT[danfse]`): o núcleo de emissão usa só
 deps permissivas; a `BrazilFiscalReport` (LGPL-3.0 pelo LICENSE/README upstream — o classifier AGPL do
 pyproject deles parece engano) só entra para gerar o PDF. Import lazy em `danfse.py`.
 
