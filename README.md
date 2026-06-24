@@ -20,7 +20,7 @@ no **padrão nacional** sem depender de robô de navegador nem da API de PDF do 
 > ⚠️ **Status: alpha.** O pipeline está **completo e funciona ponta a ponta** — `config → certificado
 > → DPS → assinatura → transporte mTLS → DANFSe` — e já **emitiu em homologação** contra o SEFIN
 > Nacional. A montagem da DPS é validada **byte a byte** contra uma implementação de referência em PHP
-> que já emite em produção. Ainda assim, é software fiscal em estágio inicial: **valide cada emissão**.
+> que já emite em produção. Ainda assim, é uma biblioteca de emissão de NFS-e em estágio inicial: **valide cada emissão**.
 
 ---
 
@@ -229,8 +229,10 @@ Como contribuir: [`CONTRIBUTING.md`](CONTRIBUTING.md). Reportar vulnerabilidades
 
 ## ⚖️ Aviso legal
 
-Software fiscal, em estágio **alpha**. **Use por sua conta e risco e valide cada emissão** — a
-responsabilidade pela nota é do emitente. Sem garantia de qualquer tipo (ver [LICENSE](LICENSE)).
+Biblioteca para emissão de NFS-e, em estágio **alpha**. **Use por sua conta e risco e valide cada
+emissão** — a responsabilidade pela nota é sempre do contribuinte/emitente. **Não é um produto
+fiscal homologado/certificado e não substitui orientação contábil.** Sem garantia de qualquer tipo
+(ver [LICENSE](LICENSE)).
 
 ## 📄 Licença
 
