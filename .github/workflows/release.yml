@@ -1,0 +1,28 @@
+name: Release
+
+# Publica no PyPI ao empurrar uma tag vX.Y.Z. Usa Trusted Publishing (OIDC) —
+# sem token/segredo no repo: configurar o publisher confiável no PyPI antes.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  build-publish:
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write          # OIDC para o Trusted Publishing do PyPI
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Build (sdist + wheel)
+        run: |
+          python -m pip install --upgrade pip build
+          python -m build
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1

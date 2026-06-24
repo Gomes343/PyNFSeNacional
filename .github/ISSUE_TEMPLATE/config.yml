@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 🔒 Vulnerabilidade de segurança
+    url: https://github.com/Gomes343/PyNFSeNacional/security/advisories/new
+    about: Reporte em PRIVADO (não abra issue pública). Ver SECURITY.md.
+  - name: 💬 Dúvidas e discussões
+    url: https://github.com/Gomes343/PyNFSeNacional/discussions
+    about: Para perguntas de uso, ideias e ajuda da comunidade.

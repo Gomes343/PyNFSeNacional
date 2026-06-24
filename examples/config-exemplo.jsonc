@@ -1,0 +1,48 @@
+// Exemplo de configuração de cliente/prestador — DADOS FICTÍCIOS.
+// ⚠️ Este .jsonc é DOCUMENTAÇÃO ANOTADA (tem comentários //) e NÃO é carregável
+//    diretamente: o config real é JSON puro. Para copiar-e-usar, parta de
+//    examples/config-exemplo.json (mesmos dados, sem comentários).
+// Schema completo e anotado: docs/conhecimento-fiscal.md §3.
+// O arquivo real fica em config/<id>.json (gitignored) e o .pfx em certs/ (gitignored).
+// Campos marcados ★ são obrigatórios.
+{
+  "id": "exemplo",
+  "nome_cliente": "EMPRESA EXEMPLO LTDA",
+  "ambiente": "homologacao",                  // default p/ execução manual
+
+  "certificado": {                            // ★ certificado A1 ICP-Brasil do PRÓPRIO prestador
+    "path": "certs/exemplo.pfx",              //   (.pfx — NUNCA versionar)
+    "senha": "0000"
+  },
+
+  "prestador": {
+    "cnpj": "00000000000000",                 // ★ 14 dígitos
+    "codigo_municipio": "0000000",            // ★ IBGE 7 díg do município do emitente
+    "uf": "RJ",
+    "inscricao_municipal": null,              //   só se o município exigir
+    "regime": {                               // ★ regime tributário
+      "opSimpNac": 3,                         //   1=Não Optante · 2=MEI · 3=Optante ME/EPP
+      "regApTribSN": 1,                       //   apuração do SN (se optante)
+      "regEspTrib": 0                         //   0=Nenhum
+    }
+    // nome/endereço do prestador NÃO entram aqui: o SEFIN puxa do cadastro (E0128/E0121)
+  },
+
+  "servico": {
+    "codigo_municipio_prestacao": "0000000",  // ★ IBGE do local da prestação
+    "cTribNac": "041601",                     // ★ 6 dígitos (LC116) — exemplo: psicologia
+    "cTribMun": "001",                        // ★ desdobro municipal (sem ele → E0312)
+    "descricao_padrao": "Serviço Prestado",
+    "tributos": {
+      "pTotTribSN": "6.00"                    // ★ se Simples: % efetiva do Simples Nacional
+    }
+  },
+
+  "dados_nota": {                             // EXEMPLO p/ teste manual; em uso real os dados
+    "serie": "1",                             //   da emissão (valor/descrição/tomador) sobrescrevem
+    "numero": "1",                            //   semente do contador nDPS
+    "valor": 1.00,
+    "descricao": "Serviço de exemplo",
+    "tomador": { "tipo": "CPF", "cpf_cnpj": "00000000000", "xNome": "TOMADOR EXEMPLO" }
+  }
+}

@@ -1,0 +1,18 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<DPS xmlns="http://www.sped.fazenda.gov.br/nfse" versao="1.00"><infDPS Id="DPS330455721122233300018100001000000000000001"><tpAmb>2</tpAmb><dhEmi>2026-06-23T19:05:19-03:00</dhEmi><verAplic>PyNFSeNacional-0.1</verAplic><serie>1</serie><nDPS>1</nDPS><dCompet>2026-06-23</dCompet><tpEmit>1</tpEmit><cLocEmi>3304557</cLocEmi><prest><CNPJ>11222333000181</CNPJ><regTrib><opSimpNac>3</opSimpNac><regApTribSN>1</regApTribSN><regEspTrib>0</regEspTrib></regTrib></prest><toma><CPF>11144477735</CPF><xNome>FULANO DE TAL</xNome></toma><serv><locPrest><cLocPrestacao>3304557</cLocPrestacao></locPrest><cServ><cTribNac>041601</cTribNac><cTribMun>001</cTribMun><xDescServ>Servico de teste</xDescServ></cServ></serv><valores><vServPrest><vServ>150.00</vServ></vServPrest><trib><tribMun><tribISSQN>1</tribISSQN><tpRetISSQN>1</tpRetISSQN></tribMun><tribFed><piscofins><CST>08</CST></piscofins></tribFed><totTrib><pTotTribSN>6.00</pTotTribSN></totTrib></trib></valores></infDPS><Signature xmlns="http://www.w3.org/2000/09/xmldsig#"><SignedInfo><CanonicalizationMethod Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"/><SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha1"/><Reference URI="#DPS330455721122233300018100001000000000000001"><Transforms><Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"/><Transform Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"/></Transforms><DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1"/><DigestValue>OWNu2VQrTQzi+rFWgXtxQr0Agzo=</DigestValue></Reference></SignedInfo><SignatureValue>ivzE92ktY1M/86sWkoQ5PL3wcGYn6Ex0hohuw+yW+7KCjltB6HMlsu8hSYL9BISXKeqd1c/fUPkTfVNQPt+Lg+9GRzALUpbSKQZkw3mVVKijfYcntqHM4PUZqjjZecXqDCOtVYOsc3cVc6O3HmgCpDSDYoMDKyhhHHrHQv/NumrzhN7PNqD2UWg9vN/zXStPIVCHmLSfVlS66XbADrfK09P0xpetTnJQoLu8Ax8hse9YQJb6EiaH0p/tETGYV6/TIOV0sHJeBFm8ZJ6w2nSbNFdWO/Kl34j1K1S/ey4b9Y3Zgevtlug0pLFpct799v9SWzw2jO/c513CYBiepajk9w==</SignatureValue><KeyInfo><X509Data><X509Certificate>MIIC2DCCAcCgAwIBAgIUISTzUYmJ2mf/7jyboSfXB4JdsJwwDQYJKoZIhvcNAQEL
+BQAwJjEkMCIGA1UEAwwbVEVTVEUgUFlORlNFOjExMjIyMzMzMDAwMTgxMB4XDTI2
+MDEwMTAwMDAwMFoXDTI4MDEwMTAwMDAwMFowJjEkMCIGA1UEAwwbVEVTVEUgUFlO
+RlNFOjExMjIyMzMzMDAwMTgxMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKC
+AQEAuhAte/1r326mV/yM0TzqG51mIDDXCByih2XK6wn/AbjG3dDEeC0UU0dZeUFf
+xX7xQqxbGtKmFDV7886YgrA9zZsZZYr0zJ6vg/RVHWDF6scizbS4H/30abO6ndDH
+5/CjpBFx59EUaaHsPX9/AWRc5ArdBbqsk6HOFJ0amG57nxtG53r0tL/69/kOpclq
+XCha/sB1oj56BpVob3etE55bAhCukrNYxUvSm3KOxC0D2ddbcxNbPFXO/4C0UST7
+RbUsh6sNHqQD3HDi3A/Jkan4nm2Gg4KdbsuhONa8iS4JB7Xu2BtxlU1nzdo7SZGN
+8U9tSQchikeAZuBdvitwmz73iwIDAQABMA0GCSqGSIb3DQEBCwUAA4IBAQBi1cxo
+XT/bJvEyIc9HGmXIHEYX2x4Bgp9o1pY85jjQuZcfFzr859rTpBV6137dCWE1ufNV
+H5mLor3owcv6fxzX4c06C/OmFMKnR5CVCW+EGhTQkXN7KVPTqVRXJ/yZfhP+Do2k
+BxOYkJurb2PSj+U5eoijEwYpF0StCZ6rZ235M1T4JT162BGbeppdypFsrFwJCF83
+n35BToWDabrH+noXUNm33OnS2foN6FPFiAZx1Vo6Nm5WtWe02bO1ALvfhzOkGlr3
+Q5tr/u0Axzb834rLJya2kuaERDq7KZbp3HKQ0CGR6AZ6rs2QTvOZ4bOgXvMDB75x
+YaIwLapxpnSB9hNH
+</X509Certificate></X509Data></KeyInfo></Signature></DPS>

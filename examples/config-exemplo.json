@@ -1,0 +1,36 @@
+{
+  "id": "exemplo",
+  "nome_cliente": "EMPRESA EXEMPLO LTDA",
+  "ambiente": "homologacao",
+  "certificado": {
+    "path": "certs/exemplo.pfx",
+    "senha": "0000"
+  },
+  "prestador": {
+    "cnpj": "00000000000000",
+    "codigo_municipio": "0000000",
+    "uf": "RJ",
+    "inscricao_municipal": null,
+    "regime": {
+      "opSimpNac": 3,
+      "regApTribSN": 1,
+      "regEspTrib": 0
+    }
+  },
+  "servico": {
+    "codigo_municipio_prestacao": "0000000",
+    "cTribNac": "041601",
+    "cTribMun": "001",
+    "descricao_padrao": "Serviço Prestado",
+    "tributos": {
+      "pTotTribSN": "6.00"
+    }
+  },
+  "dados_nota": {
+    "serie": "1",
+    "numero": "1",
+    "valor": 1.0,
+    "descricao": "Serviço de exemplo",
+    "tomador": { "tipo": "CPF", "cpf_cnpj": "00000000000", "xNome": "TOMADOR EXEMPLO" }
+  }
+}

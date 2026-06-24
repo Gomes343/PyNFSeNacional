@@ -1,0 +1,51 @@
+# ── Segredos e dados de cliente (NUNCA versionar) ─────────────────────────────
+# Certificados A1 ICP-Brasil e qualquer material criptográfico
+*.pfx
+*.p12
+*.pem
+*.key
+*.crt
+*.cer
+*.der
+*.jks
+*.keystore
+certs/
+# Configs reais de cliente (contêm CNPJ, senha do certificado, etc.)
+config/
+!examples/config-exemplo.jsonc
+!examples/config-exemplo.json
+# Variáveis de ambiente e segredos (.env, secrets.env, *.env, etc.)
+.env
+.env.*
+*.env
+secrets*
+
+# ── Saídas de emissão (XML/PDF/contadores) ────────────────────────────────────
+out/
+*.xml
+*.pdf
+!docs/**/*.pdf
+# Gabarito de teste (XML assinado pela referência PHP, cert de teste descartável — sem
+# chave privada, sem dado real): versionado de propósito p/ o golden rodar no CI.
+!tests/golden/*.xml
+
+# ── Python ────────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+env/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# ── Editores / SO ─────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+.DS_Store

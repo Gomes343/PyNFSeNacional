@@ -1,0 +1,84 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "PyNFSeNacional"
+version = "0.1.0.dev0"
+description = "Emissão de NFS-e pela API SEFIN Nacional (DPS) + geração local do DANFSe, em Python puro."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { file = "LICENSE" }
+authors = [{ name = "Murilo Gomes Teixeira" }]
+keywords = ["nfse", "nfse-nacional", "sefin", "dps", "danfse", "nota-fiscal", "fiscal", "brasil"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Natural Language :: Portuguese (Brazilian)",
+    "Programming Language :: Python :: 3",
+    "Topic :: Office/Business :: Financial :: Accounting",
+]
+
+# Dependências — a estratégia é INTEGRAR libs maduras do ecossistema fiscal Python,
+# não reimplementar criptografia. Ver docs/roadmap.md (mapa peça → biblioteca).
+dependencies = [
+    "lxml>=4.9",                    # montagem/serialização do XML da DPS + canonicalização C14N do infDPS
+    "erpbrasil.assinatura>=1.7",    # assinatura XMLDSIG do DPS (assina_xml2 por Id; a peça que era o "nó")
+    "cryptography>=42",             # leitura do certificado A1 .pfx (PKCS#12, cifras legadas ICP-Brasil)
+    "requests>=2.31",               # transporte mTLS ao SEFIN (gzip + base64)
+    "requests-pkcs12>=1.25",        # mTLS com o .pfx DIRETO (PKCS#12), como o cURL P12 do PHP
+]
+
+[project.optional-dependencies]
+# DANFSe (PDF) é OPCIONAL: `pip install PyNFSeNacional[danfse]`. Mantém o núcleo de emissão
+# enxuto e MIT-limpo — a BrazilFiscalReport é LGPL-3.0 (LICENSE/README upstream; o classifier
+# AGPL do pyproject deles parece um engano). O import é lazy em danfse.py.
+danfse = ["brazilfiscalreport[danfse]>=1.0"]
+dev = ["pytest>=8", "ruff", "mypy", "build", "hypothesis", "brazilfiscalreport[danfse]>=1.0"]
+
+[project.urls]
+Homepage = "https://github.com/Gomes343/PyNFSeNacional"
+Issues = "https://github.com/Gomes343/PyNFSeNacional/issues"
+
+[project.scripts]
+nfse-nacional = "pynfsenacional.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/pynfsenacional"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+# E/F (pyflakes+pycodestyle), I (isort), UP (pyupgrade), B (bugbear)
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+markers = [
+    "golden: compara a saida Python byte-a-byte contra o gabarito da referencia PHP",
+    "requires_cert: precisa de um certificado A1 .pfx real (rodar so localmente; pulado no CI)",
+]
+
+[tool.mypy]
+python_version = "3.10"
+files = ["src"]
+strict = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+
+# As libs do ecossistema fiscal nao publicam type stubs — nao quebrar o strict por isso.
+[[tool.mypy.overrides]]
+module = [
+    "erpbrasil.*",
+    "brazilfiscalreport.*",
+    "requests_pkcs12.*",
+    "signxml.*",
+    "lxml.*",
+    "requests.*",
+    "urllib3.*",
+]
+ignore_missing_imports = true

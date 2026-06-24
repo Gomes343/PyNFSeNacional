@@ -1,0 +1,50 @@
+name: 🐞 Reportar um bug
+description: Algo não funcionou como esperado
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Obrigado por reportar! ⚠️ **NÃO cole dados reais** — nada de certificados (`.pfx`), senhas,
+        CNPJ/CPF ou XML/PDF de notas reais. Reproduza com dados **fictícios** (ex.: CNPJ `11222333000181`).
+        Para **vulnerabilidades de segurança**, use o canal privado (ver `SECURITY.md`), não esta issue.
+  - type: textarea
+    id: o-que-aconteceu
+    attributes:
+      label: O que aconteceu?
+      description: Descreva o problema e o que você esperava que acontecesse.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduzir
+    attributes:
+      label: Como reproduzir
+      description: Passos / trecho de código mínimo (com dados fictícios).
+      render: python
+    validations:
+      required: true
+  - type: textarea
+    id: erro
+    attributes:
+      label: Mensagem de erro / E-code do SEFIN
+      description: Cole o traceback ou o código de erro (ex.: E0312). Remova qualquer dado real.
+      render: text
+  - type: input
+    id: versao
+    attributes:
+      label: Versão do PyNFSeNacional
+      placeholder: "0.1.0.dev0"
+    validations:
+      required: true
+  - type: input
+    id: python
+    attributes:
+      label: Versão do Python
+      placeholder: "3.12"
+    validations:
+      required: true
+  - type: dropdown
+    id: ambiente
+    attributes:
+      label: Ambiente
+      options: ["homologacao", "producao", "não cheguei a enviar (validação/local)"]

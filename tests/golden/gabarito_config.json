@@ -1,0 +1,26 @@
+{
+  "id": "golden",
+  "nome_cliente": "EMPRESA EXEMPLO LTDA",
+  "ambiente": "homologacao",
+  "certificado": { "path": "certs/exemplo.pfx", "senha": "0000" },
+  "prestador": {
+    "cnpj": "11222333000181",
+    "codigo_municipio": "3304557",
+    "uf": "RJ",
+    "regime": { "opSimpNac": 3, "regApTribSN": 1, "regEspTrib": 0 }
+  },
+  "servico": {
+    "codigo_municipio_prestacao": "3304557",
+    "cTribNac": "041601",
+    "cTribMun": "001",
+    "descricao_padrao": "Servico Prestado",
+    "tributos": { "pTotTribSN": "6.00" }
+  },
+  "dados_nota": {
+    "serie": "1",
+    "numero": "1",
+    "valor": 150.0,
+    "descricao": "Servico de teste",
+    "tomador": { "tipo": "CPF", "cpf_cnpj": "11144477735", "xNome": "FULANO DE TAL" }
+  }
+}
