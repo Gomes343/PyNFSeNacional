@@ -3,7 +3,7 @@
 Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/);
 versionamento [SemVer](https://semver.org/lang/pt-BR/).
 
-## [Não publicado]
+## [0.1.0] - 2026-06-24
 
 ### Adicionado
 - **Emissão ponta a ponta** de NFS-e pela API SEFIN Nacional (DPS):
@@ -27,8 +27,7 @@ versionamento [SemVer](https://semver.org/lang/pt-BR/).
 - Reprodutibilidade: lock com hashes (`requirements-dev.txt`), `mypy --strict`, CI em
   matriz 3.10–3.14, golden harness (`tests/golden/`).
 
-### Pendente (pré-publicação)
-- Criar o repositório no GitHub + reservar o nome no PyPI.
+### Limitações conhecidas / próximas versões
 - Reportar upstream o classifier de licença errado da BrazilFiscalReport (LICENSE/README=LGPL-3.0,
   mas o classifier do pyproject diz AGPL-3.0).
 - Tomador estrangeiro/sem documento; não-optantes (Lucro Presumido/Real); eventos
