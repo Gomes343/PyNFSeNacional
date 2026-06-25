@@ -62,6 +62,12 @@ ponta a ponta: **validar → montar DPS → assinar → transporte mTLS → Nota
 - `config.py` — dataclasses + `validar()` (E-codes) + loader tolerante. ✅
 - `certificado.py` — leitura do `.pfx` via `cryptography` (+ fallback cifra legada §9). ✅
 - `dps.py` — `montar_dps`/`id_dps`; o C14N do `infDPS` bate **byte-a-byte** com o PHP (golden). ✅
+  - **Fix 25/06/2026:** a `<IM>` (Inscrição Municipal) saía DEPOIS do `<regTrib>` dentro de `<prest>`,
+    violando a ordem do XSD (AnexoI) → **E1235** para todo prestador COM inscrição municipal. O golden
+    (config sem IM) não pegava; pegou o **harness de paridade** do consumidor (03-nfse), que diffa o
+    infDPS contra o motor PHP de produção. Corrigido (IM antes do regTrib) + regressão
+    `test_inscricao_municipal_vem_antes_do_regtrib`. ⚠️ Ainda **não republicado no PyPI** (v0.1.0 tem o
+    bug); republicar antes de qualquer pin da versão publicada.
 - `assinatura.py` — `assinar_dps` via `erpbrasil.assinatura`; mesmo `DigestValue` do gabarito. ✅
 - `sefin.py` — transporte mTLS (`requests-pkcs12`, P12 direto), `POST /nfse`, `verificarDps`.
   **mTLS validado ao vivo** em homologação (handshake + `HEAD /dps`, read-only). ✅
