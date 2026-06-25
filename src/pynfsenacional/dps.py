@@ -84,16 +84,19 @@ def montar_dps(
     _el(inf, "tpEmit", "1")                       # prestador é o emitente
     _el(inf, "cLocEmi", p.codigo_municipio)
 
-    # Prestador (tpEmit=1): SÓ CNPJ + regTrib — sem nome/endereço (E0128/E0121).
+    # Prestador (tpEmit=1): CNPJ + (IM) + regTrib — sem nome/endereço (E0128/E0121).
+    # ORDEM DO XSD (AnexoI): a IM (Inscrição Municipal) vem ANTES do regTrib. Emiti-la depois
+    # gera E1235 (falha de schema) para qualquer prestador que tenha IM — pegado pelo diff
+    # byte-a-byte contra o motor PHP de produção (clientes 14/229/86, que têm IM).
     prest = _el(inf, "prest")
     _el(prest, "CNPJ", documentos.digitos(p.cnpj))
+    if p.inscricao_municipal:
+        _el(prest, "IM", documentos.digitos(p.inscricao_municipal))
     reg = _el(prest, "regTrib")
     _el(reg, "opSimpNac", str(r.opSimpNac))
     if r.regApTribSN is not None:
         _el(reg, "regApTribSN", str(r.regApTribSN))
     _el(reg, "regEspTrib", str(r.regEspTrib))
-    if p.inscricao_municipal:
-        _el(prest, "IM", documentos.digitos(p.inscricao_municipal))
 
     # Tomador (opcional): só com documento; identificado EXIGE xNome (§7).
     doc = documentos.digitos(

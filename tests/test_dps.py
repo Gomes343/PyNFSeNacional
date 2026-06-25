@@ -64,6 +64,19 @@ def test_omite_nome_e_endereco_do_prestador():
     assert filhos == ["CNPJ", "regTrib"]
 
 
+def test_inscricao_municipal_vem_antes_do_regtrib():
+    # Regressão: a IM (TSInscricaoMunicipal) é uma SEQUÊNCIA no XSD AnexoI e vem ANTES do
+    # regTrib. Emiti-la depois gera E1235 (falha de schema) para todo prestador com IM. O
+    # gabarito (CONFIG_VALIDA) não tem IM, então o byte-diff não pegava — pegou o diff contra
+    # o motor PHP de produção (clientes com inscrição municipal).
+    cfg = ClienteConfig.from_dict({**CONFIG_VALIDA,
+                                   "prestador": {**CONFIG_VALIDA["prestador"],
+                                                 "inscricao_municipal": "02200392"}})
+    prest = _inf(_montar(cfg)).find(f"{{{NS}}}prest")
+    assert [etree.QName(c).localname for c in prest] == ["CNPJ", "IM", "regTrib"]
+    assert prest.find(f"{{{NS}}}IM").text == "02200392"
+
+
 def test_tomador_identificado_tem_cpf_e_nome():
     inf = _inf(_montar(ClienteConfig.from_dict(CONFIG_VALIDA)))
     assert _txt(inf, "toma/CPF") == "11144477735"
