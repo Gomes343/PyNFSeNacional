@@ -53,6 +53,36 @@ def id_dps(cfg: ClienteConfig, numero: str, serie: str = "1") -> str:
     )
 
 
+def _montar_end_toma(toma: etree._Element, end: Any) -> None:
+    """Anexa o bloco ``<end>`` (TCEndereco nacional) ao ``<toma>``/``<interm>``, na ordem
+    EXATA do XSD: ``endNac(cMun, CEP) → xLgr → nro → xCpl? → xBairro``.
+
+    BLOCO ATÔMICO (tudo-ou-nada): se faltar qualquer obrigatório (cMun 7 díg, CEP 8 díg,
+    logradouro, bairro), OMITE o endereço inteiro — um bloco parcial é E1235. Mesma regra
+    do ``gt_montar_endereco``/``montarEnderecoTcEndereco`` do motor PHP de referência.
+    ``nro`` cai para 'S/N' quando vazio. Endereço no exterior (endExt) não é coberto aqui.
+    """
+    if not isinstance(end, dict) or not end:
+        return
+    cmun = documentos.digitos(end.get("cMun") or end.get("codigo_municipio") or end.get("ibge"))
+    cep = documentos.digitos(end.get("cep") or end.get("CEP"))
+    xlgr = str(end.get("logradouro") or end.get("xLgr") or "").strip()
+    bairro = str(end.get("bairro") or end.get("xBairro") or "").strip()
+    nro = str(end.get("numero") or end.get("nro") or "").strip() or "S/N"
+    if len(cmun) != 7 or len(cep) != 8 or not xlgr or not bairro:
+        return  # parcial = E1235 → omite o endereço inteiro (atômico, igual ao PHP)
+    el_end = _el(toma, "end")
+    endnac = _el(el_end, "endNac")
+    _el(endnac, "cMun", cmun)
+    _el(endnac, "CEP", cep)
+    _el(el_end, "xLgr", xlgr[:255])
+    _el(el_end, "nro", nro[:60])
+    cpl = str(end.get("complemento") or end.get("xCpl") or "").strip()
+    if cpl:
+        _el(el_end, "xCpl", cpl[:156])
+    _el(el_end, "xBairro", bairro[:60])
+
+
 def montar_dps(
     cfg: ClienteConfig, *, numero: str, valor: float, descricao: str,
     tomador: dict[str, Any] | None, ambiente: str, serie: str = "1",
@@ -61,6 +91,8 @@ def montar_dps(
     """Monta o XML da DPS (string, NÃO assinado) a partir da config + dados da emissão.
 
     `tomador`: {"cpf_cnpj": "...", "nome": "..."} ou None (consumidor final → omite <toma>).
+        Campos OPCIONAIS (entram no <toma> quando presentes, na ordem do XSD): "im",
+        "fone"/"telefone", "email", e "endereco" (bloco atômico — ver _montar_end_toma).
     `ambiente`: "homologacao" (tpAmb=2) | "producao" (tpAmb=1).
     `dh_emi`/`d_comp`/`ver_aplic`: injetáveis (default = relógio de Brasília / constante);
     o golden passa valores fixos para o byte-diff ser determinístico.
@@ -99,15 +131,28 @@ def montar_dps(
     _el(reg, "regEspTrib", str(r.regEspTrib))
 
     # Tomador (opcional): só com documento; identificado EXIGE xNome (§7).
-    doc = documentos.digitos(
-        (tomador or {}).get("cpf_cnpj") or (tomador or {}).get("cpf") or (tomador or {}).get("cnpj")
-    )
+    # ORDEM DO XSD (TSDestinaDps, AnexoI B-34..B-46): CPF|CNPJ → IM → xNome → end → fone → email.
+    # Trocar a ordem (ex.: email antes de end) = E1235. Tudo abaixo de xNome é OPCIONAL: end/
+    # fone/email só entram quando vierem nos dados → sem eles o XML é IDÊNTICO ao de antes (o
+    # golden, cujo tomador não tem endereço, segue bate-byte). Espelha o buildTomador do PHP.
+    tom = tomador or {}
+    doc = documentos.digitos(tom.get("cpf_cnpj") or tom.get("cpf") or tom.get("cnpj"))
     if doc:
         toma = _el(inf, "toma")
         _el(toma, "CNPJ" if len(doc) == 14 else "CPF", doc)
-        nome = ((tomador or {}).get("nome") or (tomador or {}).get("xNome") or "").strip()
+        im = documentos.digitos(tom.get("im") or tom.get("inscricao_municipal"))
+        if im:
+            _el(toma, "IM", im)
+        nome = (tom.get("nome") or tom.get("xNome") or "").strip()
         if nome:
             _el(toma, "xNome", nome)
+        _montar_end_toma(toma, tom.get("endereco") or tom.get("end"))
+        fone = documentos.digitos(tom.get("fone") or tom.get("telefone"))
+        if fone:
+            _el(toma, "fone", fone)
+        email = (tom.get("email") or "").strip()
+        if email:
+            _el(toma, "email", email[:80])
 
     # Serviço: local da prestação + código (par cTribNac+cTribMun) + descrição.
     serv = _el(inf, "serv")

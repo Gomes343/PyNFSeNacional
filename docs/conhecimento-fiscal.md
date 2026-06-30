@@ -191,7 +191,12 @@ contribuinte é operação de município — o prestador recebe 404). Consequên
 
 - **Tomador identificado → precisa do `xNome`.** Obter de cadastro próprio (o usuário informa) ou,
   para CNPJ, da razão social pública (ex.: BrasilAPI) para não precisar perguntar.
-- **Endereço do tomador é opcional** (`0-1`) — não exigido.
+- **Endereço do tomador é opcional** (`0-1`) — não exigido, mas **emitido quando fornecido**
+  (desde 30/06/2026). O `<toma>` aceita, além de CPF/CNPJ + xNome, os campos OPCIONAIS na ordem
+  do XSD: **`IM → end → fone → email`** (trocar a ordem = E1235). O `<end>` nacional é **bloco
+  atômico** (tudo-ou-nada): `endNac(cMun 7díg, CEP 8díg) → xLgr → nro → xCpl? → xBairro`; faltando
+  qualquer obrigatório (cMun/CEP/logradouro/bairro), omite o endereço inteiro. `fone` = só dígitos;
+  `email` ≤ 80. Endereço no exterior (`endExt`) ainda não coberto.
 - **Consumidor final / não identificado** → omitir o bloco `<toma>` por completo.
 
 ---

@@ -68,6 +68,12 @@ ponta a ponta: **validar → montar DPS → assinar → transporte mTLS → Nota
     infDPS contra o motor PHP de produção. Corrigido (IM antes do regTrib) + regressão
     `test_inscricao_municipal_vem_antes_do_regtrib`. ⚠️ Ainda **não republicado no PyPI** (v0.1.0 tem o
     bug); republicar antes de qualquer pin da versão publicada.
+  - **Feature 30/06/2026:** o `<toma>` passou a emitir os campos OPCIONAIS do tomador — `IM`,
+    `<end>` (endereço nacional, bloco atômico), `<fone>`, `<email>` — na ordem do XSD (CPF|CNPJ →
+    IM → xNome → end → fone → email; `end` = endNac(cMun,CEP) → xLgr → nro → xCpl? → xBairro).
+    Aditivo: sem esses campos o XML é idêntico (golden segue bate-byte). Espelha o `buildTomador`
+    do PHP de referência. Helper `_montar_end_toma` (atômico: omite o `end` inteiro se incompleto).
+    Validado em homologação real (SEFIN aceitou `<toma>` com `<end>`+`<fone>`).
 - `assinatura.py` — `assinar_dps` via `erpbrasil.assinatura`; mesmo `DigestValue` do gabarito. ✅
 - `sefin.py` — transporte mTLS (`requests-pkcs12`, P12 direto), `POST /nfse`, `verificarDps`.
   **mTLS validado ao vivo** em homologação (handshake + `HEAD /dps`, read-only). ✅

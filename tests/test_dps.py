@@ -88,6 +88,62 @@ def test_sem_tomador_omite_bloco():
     assert inf.find(f"{{{NS}}}toma") is None
 
 
+def test_tomador_endereco_fone_email_ordem_do_xsd():
+    # Campos opcionais do tomador (end/fone/email) na ORDEM do XSD (TSDestinaDps):
+    # CPF|CNPJ → IM → xNome → end → fone → email. Fora de ordem = E1235.
+    tom = {
+        "cpf_cnpj": "45192564000101", "nome": "PREFEITURA MUNICIPAL DE SILVEIRAS",
+        "im": "12345",
+        "endereco": {"cep": "12690-000", "logradouro": "ANTONIO PEREIRA AZEVEDO",
+                     "numero": "52", "bairro": "CENTRO", "cMun": "3552007"},
+        "fone": "(12) 3106-1150", "email": "contato@silveiras.sp.gov.br",
+    }
+    toma = _inf(_montar(ClienteConfig.from_dict(CONFIG_VALIDA), tomador=tom)).find(f"{{{NS}}}toma")
+    assert [etree.QName(c).localname for c in toma] == \
+        ["CNPJ", "IM", "xNome", "end", "fone", "email"]
+    assert toma.find(f"{{{NS}}}fone").text == "1231061150"        # só dígitos
+    assert toma.find(f"{{{NS}}}email").text == "contato@silveiras.sp.gov.br"
+    # <end> nacional, ordem interna: endNac(cMun, CEP) → xLgr → nro → xBairro (sem xCpl aqui)
+    end = toma.find(f"{{{NS}}}end")
+    assert [etree.QName(c).localname for c in end] == ["endNac", "xLgr", "nro", "xBairro"]
+    endnac = end.find(f"{{{NS}}}endNac")
+    assert [etree.QName(c).localname for c in endnac] == ["cMun", "CEP"]
+    assert endnac.find(f"{{{NS}}}cMun").text == "3552007"
+    assert endnac.find(f"{{{NS}}}CEP").text == "12690000"         # CEP sem traço, 8 díg
+    assert end.find(f"{{{NS}}}xLgr").text == "ANTONIO PEREIRA AZEVEDO"
+    assert end.find(f"{{{NS}}}nro").text == "52"
+    assert end.find(f"{{{NS}}}xBairro").text == "CENTRO"
+
+
+def test_tomador_endereco_com_complemento():
+    tom = {"cpf_cnpj": "45192564000101", "nome": "X",
+           "endereco": {"cep": "12690000", "logradouro": "RUA A", "numero": "10",
+                        "complemento": "Sala 2", "bairro": "CENTRO", "cMun": "3552007"}}
+    end = _inf(_montar(ClienteConfig.from_dict(CONFIG_VALIDA),
+                       tomador=tom)).find(f"{{{NS}}}toma/{{{NS}}}end")
+    assert [etree.QName(c).localname for c in end] == ["endNac", "xLgr", "nro", "xCpl", "xBairro"]
+    assert end.find(f"{{{NS}}}xCpl").text == "Sala 2"
+
+
+def test_tomador_endereco_incompleto_e_omitido_atomico():
+    # Bloco parcial (sem bairro) = E1235 → omite o endereço INTEIRO (tudo-ou-nada), mas a
+    # nota continua válida (CNPJ + xNome). Espelha o gt_montar_endereco do PHP.
+    tom = {"cpf_cnpj": "45192564000101", "nome": "X",
+           "endereco": {"cep": "12690000", "logradouro": "RUA A", "numero": "10",
+                        "cMun": "3552007"}}  # falta xBairro
+    toma = _inf(_montar(ClienteConfig.from_dict(CONFIG_VALIDA),
+                        tomador=tom)).find(f"{{{NS}}}toma")
+    assert toma.find(f"{{{NS}}}end") is None
+    assert [etree.QName(c).localname for c in toma] == ["CNPJ", "xNome"]
+
+
+def test_tomador_sem_extras_xml_inalterado():
+    # Sem end/fone/email/IM o <toma> é idêntico ao de antes (só doc + xNome) — garante que a
+    # extensão é puramente ADITIVA (o golden, cujo tomador não tem endereço, segue bate-byte).
+    toma = _inf(_montar(ClienteConfig.from_dict(CONFIG_VALIDA))).find(f"{{{NS}}}toma")
+    assert [etree.QName(c).localname for c in toma] == ["CPF", "xNome"]
+
+
 def test_par_ctribnac_ctribmun():
     inf = _inf(_montar(ClienteConfig.from_dict(CONFIG_VALIDA)))
     assert _txt(inf, "serv/cServ/cTribNac") == "041601"
