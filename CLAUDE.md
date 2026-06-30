@@ -66,8 +66,8 @@ ponta a ponta: **validar → montar DPS → assinar → transporte mTLS → Nota
     violando a ordem do XSD (AnexoI) → **E1235** para todo prestador COM inscrição municipal. O golden
     (config sem IM) não pegava; pegou o **harness de paridade** do consumidor (03-nfse), que diffa o
     infDPS contra o motor PHP de produção. Corrigido (IM antes do regTrib) + regressão
-    `test_inscricao_municipal_vem_antes_do_regtrib`. ⚠️ Ainda **não republicado no PyPI** (v0.1.0 tem o
-    bug); republicar antes de qualquer pin da versão publicada.
+    `test_inscricao_municipal_vem_antes_do_regtrib`. ✅ Publicado na **v0.2.0** (junto com o bloco de
+    endereço do tomador); a v0.1.0 do PyPI tem o bug da IM — pinar **≥0.2.0**.
   - **Feature 30/06/2026:** o `<toma>` passou a emitir os campos OPCIONAIS do tomador — `IM`,
     `<end>` (endereço nacional, bloco atômico), `<fone>`, `<email>` — na ordem do XSD (CPF|CNPJ →
     IM → xNome → end → fone → email; `end` = endNac(cMun,CEP) → xLgr → nro → xCpl? → xBairro).
