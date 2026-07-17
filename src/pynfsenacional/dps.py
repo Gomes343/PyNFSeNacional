@@ -27,7 +27,14 @@ from .config import ClienteConfig
 
 NS = "http://www.sped.fazenda.gov.br/nfse"
 VER_APLIC = "PyNFSeNacional-0.1"   # ≤ 20 chars (TSVerAplic / E1235)
-VERSAO_DPS = "1.00"
+# Leiaute da DPS. 1.01 = layout RTC (NT 004 v2.0 / NT 007). Há revisão OFICIAL do XSD v1.01 cujo
+# TVerNFSe casa SÓ "1.01" (rejeita "1.00"); "1.01" é aceito por todas as revisões — o bump é
+# defensivo para as validações RTC obrigatórias em 03/08/2026. Validado em homologação e em
+# emissão de produção real (notas emitidas em 1.01 e canceladas). O grupo IBSCBS segue OPCIONAL
+# no schema (minOccurs=0) e o Simples é DISPENSADO do destaque IBS/CBS em 2026 → o montador NÃO
+# emite o grupo. O atributo `versao` fica na raiz <DPS>, FORA do infDPS assinado → o C14N/
+# DigestValue e o golden não mudam (a paridade com a implementação PHP de referência segue intacta).
+VERSAO_DPS = "1.01"
 
 
 def _el(parent: etree._Element, tag: str, texto: str | None = None) -> etree._Element:
