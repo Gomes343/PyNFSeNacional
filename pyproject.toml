@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "PyNFSeNacionalGT"
-version = "0.2.0"
+version = "0.3.0"
 description = "Emissão de NFS-e pela API SEFIN Nacional (DPS) + geração local do DANFSe, em Python puro."
 readme = "README.md"
 requires-python = ">=3.10"
