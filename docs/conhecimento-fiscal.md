@@ -203,9 +203,17 @@ contribuinte é operação de município — o prestador recebe 404). Consequên
 
 ## 8. IBS/CBS (reforma tributária) — planejado
 
-Os campos do grupo `IBSCBS` têm validação **suspensa** no início; emite-se sem eles por ora. Quando
-a obrigatoriedade entrar, acrescentar o grupo (CST/cClassTrib, alíquotas IBS UF/Mun e CBS) ao
-montador da DPS.
+O **leiaute** da DPS já está em **1.01** (RTC — NT 004 v2.0 / NT 007); ver `VERSAO_DPS` em `dps.py`.
+O grupo `IBSCBS` é **opcional no schema** (`minOccurs=0`) e o montador **ainda não o emite**.
+
+**Cronograma:** a partir de **03/08/2026** o grupo IBS/CBS + validações passam a ser **obrigatórios**
+na NFS-e Nacional (rejeição da DPS) — **porém só para Regime Regular** (Lucro Presumido/Real). O
+**Simples Nacional é dispensado** do destaque em 2026: os campos do destaque do Simples só entram na
+**NT 009** (sem data de produção), e o destaque do Simples só vale a partir de **2027**. Por isso,
+para os perfis atualmente suportados (Simples), emite-se **sem** o grupo.
+
+Quando entrar em escopo (um prestador de Regime Regular, ou mudança do SEFIN), acrescentar o grupo
+(CST/cClassTrib, alíquotas IBS UF/Mun e CBS, `indZFMALC`) ao montador da DPS.
 
 ---
 

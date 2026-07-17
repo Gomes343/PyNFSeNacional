@@ -18,9 +18,10 @@ no **padrão nacional** sem depender de robô de navegador nem da API de PDF do 
 </div>
 
 > ⚠️ **Status: alpha.** O pipeline está **completo e funciona ponta a ponta** — `config → certificado
-> → DPS → assinatura → transporte mTLS → DANFSe` — e já **emitiu em homologação** contra o SEFIN
-> Nacional. A montagem da DPS é validada **byte a byte** contra uma implementação de referência em PHP
-> que já emite em produção. Ainda assim, é uma biblioteca de emissão de NFS-e em estágio inicial: **valide cada emissão**.
+> → DPS → assinatura → transporte mTLS → DANFSe` — e já **emitiu em homologação e em produção real**
+> contra o SEFIN Nacional. A montagem da DPS é validada **byte a byte** contra uma implementação de
+> referência em PHP que já emite em produção. Ainda assim, é uma biblioteca de emissão de NFS-e em
+> estágio inicial: **valide cada emissão**.
 
 ---
 
@@ -66,8 +67,8 @@ pip install "PyNFSeNacionalGT[danfse]"
 
 > Requer **Python 3.10+**. No PyPI o pacote se chama **`PyNFSeNacionalGT`** (o nome `PyNFSeNacional`
 > esbarra na proteção do PyPI por semelhança com outro projeto); o **import continua `pynfsenacional`**.
-> Durante o alpha ainda não há release publicado — para testar agora, instale do código (ver
-> [Desenvolvimento](#-desenvolvimento)).
+> Pin recomendado: **`PyNFSeNacionalGT>=0.3.0`** — a v0.1.0 tem o bug de ordem da `<IM>` (corrigido na
+> 0.2.0) e a 0.3.0 traz o leiaute RTC 1.01.
 
 ---
 
@@ -204,9 +205,13 @@ config (JSON)  →  montar DPS (XML)  →  assinar (XMLDSIG)  →  gzip+base64 �
 - ✅ Transporte mTLS + idempotência — **emissão real validada em homologação**
 - ✅ DANFSe local (PDF)
 - ✅ CLI turnkey + logging
-- ⏳ Endurecimento a partir de mais emissões reais; publicação no PyPI
+- ✅ Publicado no PyPI (`PyNFSeNacionalGT`)
+- ✅ Tomador completo: `IM`, endereço, telefone e e-mail no `<toma>` (v0.2.0)
+- ✅ Leiaute **RTC 1.01** da DPS (NT 004 v2.0 / NT 007) — pronto para as validações obrigatórias de **03/08/2026**
+- ⏳ Endurecimento a partir de mais emissões reais
 - ⏳ Tomador estrangeiro / sem documento; não-optantes (Lucro Presumido/Real)
-- ⏳ Eventos (cancelamento); IBS/CBS (reforma tributária)
+- ⏳ Grupo **IBS/CBS** na DPS — obrigatório **só para Regime Regular** a partir de 03/08/2026 (o Simples é **dispensado** do destaque em 2026); **ainda não emitido**
+- ⏳ Eventos (cancelamento)
 
 Detalhes em [`docs/roadmap.md`](docs/roadmap.md) e [`CHANGELOG.md`](CHANGELOG.md).
 
