@@ -36,8 +36,8 @@ adicionando o que faltava (o transporte ao SEFIN nacional + o acabamento).
 ### Duas confusões que este projeto já resolve
 
 1. **Existem duas APIs do governo.** A de **emissão** (SEFIN Nacional) recebe a **DPS** assinada e
-   devolve a **NFS-e** — é viva e é o futuro. A de **geração de PDF/DANFSe** (ADN) é **descontinuada
-   em 01/07/2026** (NT-008/2026). Por isso, aqui o **DANFSe é gerado localmente**.
+   devolve a **NFS-e** — é viva e é o futuro. A de **geração de PDF/DANFSe** (ADN) está sendo
+   **descontinuada** (NT-008/2026). Por isso, aqui o **DANFSe é gerado localmente**.
 2. **`ambGer` não é ambiente.** O indicador Produção/Homologação é o `tpAmb`, **não** o `ambGer`
    (toda nota nacional tem `ambGer=2`). Confundir os dois marca nota de produção como "sem validade".
 
@@ -107,6 +107,14 @@ nfse-nacional emitir config/cliente.json \
 | `❌ não emitida: [E0312] …` | rejeitada pelo SEFIN, com o código do erro |
 | `❌ config inválida: …` | barrada **antes** do envio pela validação local |
 
+> Os `00000000000` acima são **placeholders**: o tomador precisa de CPF/CNPJ **válido** (a lib
+> confere o dígito mód-11 localmente). Sem tomador, a nota sai como **consumidor final** (omite `<toma>`).
+
+> **Operação:** o `nDPS` é um contador **interno** por prestador+ambiente, persistido em
+> `out/numero_<id>_<ambiente>.txt` — quem atribui o `nNFSe` é o SEFIN. Reenviar a mesma DPS é
+> **idempotente** (`verificarDps`): não duplica. Para acompanhar o passo a passo, rode
+> `nfse-nacional -v emitir …` (o `-v` vem **antes** do subcomando).
+
 ---
 
 ## 🔧 Configuração (passo a passo)
@@ -132,7 +140,7 @@ Cada prestador é descrito por um **JSON puro**. Comece copiando o exemplo anota
     "cnpj": "00000000000000",           // ★ 14 dígitos
     "codigo_municipio": "0000000",      // ★ IBGE 7 díg do município do emitente
     "regime": {                         // ★ regime tributário
-      "opSimpNac": 3,                   //   1=Não Optante · 2=MEI · 3=Optante ME/EPP
+      "opSimpNac": 3,                   //   1=Não Optante (roadmap) · 2=MEI · 3=Optante ME/EPP
       "regApTribSN": 1,
       "regEspTrib": 0
     }
@@ -202,16 +210,17 @@ config (JSON)  →  montar DPS (XML)  →  assinar (XMLDSIG)  →  gzip+base64 �
 - ✅ Leitura do certificado A1 (`.pfx`)
 - ✅ Montagem da DPS — **C14N idêntico, byte a byte, à referência PHP** (golden)
 - ✅ Assinatura XMLDSIG (mesmo `DigestValue` do gabarito)
-- ✅ Transporte mTLS + idempotência — **emissão real validada em homologação**
+- ✅ Transporte mTLS + idempotência — **emissão real validada em homologação e produção**
 - ✅ DANFSe local (PDF)
 - ✅ CLI turnkey + logging
 - ✅ Publicado no PyPI (`PyNFSeNacionalGT`)
 - ✅ Tomador completo: `IM`, endereço, telefone e e-mail no `<toma>` (v0.2.0)
-- ✅ Leiaute **RTC 1.01** da DPS (NT 004 v2.0 / NT 007) — pronto para as validações obrigatórias de **03/08/2026**
+- ✅ Leiaute **RTC 1.01** da DPS (NT 004 v2.0 / NT 007) — alinhado à revisão oficial do XSD (defensivo p/ o endurecimento das validações RTC)
 - ⏳ Endurecimento a partir de mais emissões reais
 - ⏳ Tomador estrangeiro / sem documento; não-optantes (Lucro Presumido/Real)
 - ⏳ Grupo **IBS/CBS** na DPS — obrigatório **só para Regime Regular** a partir de 03/08/2026 (o Simples é **dispensado** do destaque em 2026); **ainda não emitido**
 - ⏳ Eventos (cancelamento)
+- ⏳ DANFSe: exibir o **total aproximado de tributos** do Simples (`pTotTribSN`, Lei 12.741) — hoje sai como "—" (o `BrazilFiscalReport` não lê esse campo)
 
 Detalhes em [`docs/roadmap.md`](docs/roadmap.md) e [`CHANGELOG.md`](CHANGELOG.md).
 
