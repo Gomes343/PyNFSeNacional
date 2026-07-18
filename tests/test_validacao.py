@@ -40,7 +40,6 @@ def test_config_valida_nao_tem_problemas():
         ({"prestador__codigo_municipio": "33045"}, "7 dígitos"),
         ({"servico__cTribNac": "0416010"}, "E1235"),          # 7 dígitos
         ({"servico__cTribNac": "04160"}, "E1235"),            # 5 dígitos
-        ({"servico__cTribMun": ""}, "E0312"),                 # sem desdobro municipal
         ({"servico__codigo_municipio_prestacao": "abc"}, "local da prestação"),
         ({"ambiente": "producaoXX"}, "ambiente inválido"),
     ],
@@ -65,6 +64,16 @@ def test_nao_optante_nao_exige_ptottribsn():
     d["servico"]["tributos"] = {}
     problemas = ClienteConfig.from_dict(d).validar()
     assert not any("pTotTribSN" in p for p in problemas), problemas
+
+
+def test_ctribmun_vazio_e_permitido():
+    # cTribMun é OPCIONAL (minOccurs=0 no XSD): há municípios sem desdobro que REJEITAM o campo
+    # (Curitiba → E0315 se informado). Config sem cTribMun NÃO deve gerar E0312; o dps.py omite o
+    # elemento. Também construir o Servico sem a chave cTribMun deve funcionar (default "").
+    assert not any("cTribMun" in p or "E0312" in p for p in _cfg(servico__cTribMun="").validar())
+    d = copy.deepcopy(CONFIG_VALIDA)
+    d["servico"].pop("cTribMun", None)                # chave AUSENTE (não só vazia)
+    assert ClienteConfig.from_dict(d).servico.cTribMun == ""
 
 
 # ── validar_tomador() — E1235 §7 ────────────────────────────────────────────
