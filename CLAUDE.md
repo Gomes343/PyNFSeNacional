@@ -74,6 +74,12 @@ ponta a ponta: **validar → montar DPS → assinar → transporte mTLS → Nota
     Aditivo: sem esses campos o XML é idêntico (golden segue bate-byte). Espelha o `buildTomador`
     do PHP de referência. Helper `_montar_end_toma` (atômico: omite o `end` inteiro se incompleto).
     Validado em homologação real (SEFIN aceitou `<toma>` com `<end>`+`<fone>`).
+  - **Fix 24/07/2026 (MEI):** `opSimpNac=2` (MEI) tinha a mesma DPS do ME/EPP (`opSimpNac=3`) —
+    errado. MEI é **isento** do valor aproximado dos tributos (**Decreto 8.264/2014**): `totTrib` usa
+    `indTotTrib=0` (não `pTotTribSN`) e `regTrib` **omite** `regApTribSN`. Chaveamento no motor
+    (`dps.py` `regTrib`/`totTrib`) + validador só exige `pTotTribSN` p/ `opSimpNac==3`. Regra em
+    `docs/conhecimento-fiscal.md §3 "MEI"`; testes `test_mei_usa_indtottrib_e_omite_regaptribsn` e
+    `test_mei_nao_exige_ptottribsn`. Descoberto no XML real do EmissorWeb de um MEI (Ibirité/MG).
 - `assinatura.py` — `assinar_dps` via `erpbrasil.assinatura`; mesmo `DigestValue` do gabarito. ✅
 - `sefin.py` — transporte mTLS (`requests-pkcs12`, P12 direto), `POST /nfse`, `verificarDps`.
   **mTLS validado ao vivo** em homologação (handshake + `HEAD /dps`, read-only). ✅

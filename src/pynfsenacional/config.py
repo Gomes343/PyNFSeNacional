@@ -182,12 +182,14 @@ class ClienteConfig:
                 f"{s.codigo_municipio_prestacao!r}"
             )
 
-        # Tributos: Simples (MEI/ME-EPP) exige pTotTribSN (E0712/E1235)
-        if r.opSimpNac in (2, 3):
+        # Tributos (E0712/E1235): só ME/EPP optante do Simples (opSimpNac=3) exige pTotTribSN.
+        # MEI (opSimpNac=2) é ISENTO de declarar o valor aproximado dos tributos (Decreto
+        # 8.264/2014) → usa totTrib/indTotTrib=0, NÃO pTotTribSN. Não Optante (1) usa indTotTrib.
+        if r.opSimpNac == 3:
             ptot = s.tributos.get("pTotTribSN")
             if ptot is None or str(ptot).strip() == "":
                 problemas.append(
-                    f"E0712/E1235: prestador é Simples (opSimpNac={r.opSimpNac}) → "
+                    f"E0712/E1235: prestador é ME/EPP optante do Simples (opSimpNac=3) → "
                     f"'pTotTribSN' é obrigatório em servico.tributos"
                 )
             else:

@@ -170,3 +170,22 @@ def test_nao_optante_usa_indtottrib():
     inf = _inf(_montar(d))
     tot = inf.find(f"{{{NS}}}valores/{{{NS}}}trib/{{{NS}}}totTrib")
     assert [etree.QName(c).localname for c in tot] == ["indTotTrib"]
+
+
+def test_mei_usa_indtottrib_e_omite_regaptribsn():
+    # MEI (opSimpNac=2) é ISENTO do valor aproximado dos tributos (Decreto 8.264/2014):
+    # totTrib usa indTotTrib (NÃO pTotTribSN), e o regTrib NÃO leva regApTribSN — igual à nota
+    # real do EmissorWeb do gov. O chaveamento é do MOTOR: mesmo com regApTribSN no config
+    # (default do RegimeConfig é 1), o MEI o omite. Regressão do 1º cliente MEI no motor API.
+    cfg = ClienteConfig.from_dict({**CONFIG_VALIDA,
+                                   "prestador": {**CONFIG_VALIDA["prestador"],
+                                                 "regime": {"opSimpNac": 2, "regApTribSN": 1,
+                                                            "regEspTrib": 0}}})
+    inf = _inf(_montar(cfg))
+    reg = inf.find(f"{{{NS}}}prest/{{{NS}}}regTrib")
+    assert [etree.QName(c).localname for c in reg] == ["opSimpNac", "regEspTrib"]
+    trib = inf.find(f"{{{NS}}}valores/{{{NS}}}trib")
+    # E0676: MEI NÃO pode ter tribFed (PIS/COFINS) — só tribMun + totTrib(indTotTrib).
+    assert [etree.QName(c).localname for c in trib] == ["tribMun", "totTrib"]
+    tot = trib.find(f"{{{NS}}}totTrib")
+    assert [etree.QName(c).localname for c in tot] == ["indTotTrib"]

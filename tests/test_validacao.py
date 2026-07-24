@@ -66,6 +66,16 @@ def test_nao_optante_nao_exige_ptottribsn():
     assert not any("pTotTribSN" in p for p in problemas), problemas
 
 
+def test_mei_nao_exige_ptottribsn():
+    # opSimpNac=2 (MEI) é isento do valor aproximado dos tributos (Decreto 8.264/2014):
+    # usa indTotTrib, NÃO pTotTribSN → o validador não deve exigir pTotTribSN.
+    d = copy.deepcopy(CONFIG_VALIDA)
+    d["prestador"]["regime"]["opSimpNac"] = 2
+    d["servico"]["tributos"] = {}
+    problemas = ClienteConfig.from_dict(d).validar()
+    assert not any("pTotTribSN" in p for p in problemas), problemas
+
+
 def test_ctribmun_vazio_e_permitido():
     # cTribMun é OPCIONAL (minOccurs=0 no XSD): há municípios sem desdobro que REJEITAM o campo
     # (Curitiba → E0315 se informado). Config sem cTribMun NÃO deve gerar E0312; o dps.py omite o

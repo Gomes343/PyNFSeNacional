@@ -126,6 +126,23 @@ Cada prestador é descrito por um JSON. Campos marcados ★ são **obrigatórios
 - **Nome e endereço do prestador** (do cadastro nacional) → enviar dá **E0128/E0121**.
 - **Número fiscal `nNFSe`** — o SEFIN atribui, continuando a sequência real do prestador (§5).
 
+### ★ MEI (`opSimpNac=2`) — rotina de emissão DIFERENTE do ME/EPP
+O MEI é optante do Simples, mas **não** segue a mesma DPS do ME/EPP (`opSimpNac=3`). O motor precisa
+**chavear pelo `opSimpNac`** (validado contra a nota real do EmissorWeb do governo — um MEI de Ibirité/MG):
+
+| Elemento | ME/EPP optante (`opSimpNac=3`) | **MEI (`opSimpNac=2`)** |
+|---|---|---|
+| `regTrib/regApTribSN` | presente (ex.: `1`) | **omitido** — não se aplica ao MEI |
+| `valores/trib/totTrib` | `pTotTribSN` (% do Simples) | **`indTotTrib=0`** — MEI é **isento** de declarar o valor aproximado dos tributos (**Decreto 8.264/2014**) |
+| `cServ/cTribMun` | conforme o município (senão E0312) | frequentemente **ausente** (o município pode não usar desdobro para o serviço do MEI) |
+
+- **Por que `indTotTrib` e não `pTotTribSN`:** o E0712 proíbe `indTotTrib` para **ME/EPP**, mas o MEI
+  é justamente o caso de **não informar** (Decreto 8.264/2014). Usar `pTotTribSN` num MEI destoa da
+  nota real e informa um percentual que não se aplica.
+- **Não Optante (`opSimpNac=1`)** também usa `indTotTrib`; só o **ME/EPP (3)** usa `pTotTribSN`.
+- O motor implementa esse chaveamento em `dps.py` (`regTrib` e `totTrib`) e o validador só exige
+  `pTotTribSN` quando `opSimpNac==3`. Regressão: `test_mei_usa_indtottrib_e_omite_regaptribsn`.
+
 ---
 
 ## 4. ★ Tabela de erros do SEFIN (a jornada — todos resolvidos)
@@ -139,7 +156,7 @@ A regra de cada erro é **fiscal**, vale para qualquer linguagem. A "Solução" 
 | **E0312** | "código não administrado pelo município" | mandava só `cTribNac` | enviar **`cTribNac` + `cTribMun`** (o município administra a COMBINAÇÃO) |
 | **E0128** | "endereço do prestador não deve ser informado" | prestador=emitente (`tpEmit=1`) | **omitir** o endereço do prestador (SEFIN puxa do cadastro) |
 | **E0121** | "nome/razão do prestador não deve ser informado" | idem | **omitir** o nome — bloco do prestador = só CNPJ + regime |
-| **E0712** | "ME/EPP: `indTotTrib` não pode ser informado" | Simples não usa `indTotTrib` | usar **`totTrib/pTotTribSN`** (% efetiva do SN) |
+| **E0712** | "ME/EPP: `indTotTrib` não pode ser informado" | **ME/EPP** (`opSimpNac=3`) não usa `indTotTrib` | ME/EPP → **`totTrib/pTotTribSN`** (% efetiva do SN). ⚠️ **MEI (`opSimpNac=2`) é o oposto**: usa `indTotTrib=0` (Decreto 8.264/2014) — ver §3 "MEI" |
 | **E1235** | "trib sem `totTrib`" | `totTrib` é obrigatório | sempre enviar `totTrib` (`pTotTribSN` p/ Simples; `indTotTrib` p/ não optante) |
 | **E1235** | "Pattern TSCodTribNac" | `cTribNac` com 9 díg | `cTribNac` é **6 díg**; o desdobro vai em `cTribMun` |
 | **E1235** | "Falha no esquema (verAplic)" | `verAplic` > 20 chars | **`verAplic` ≤ 20** caracteres |

@@ -4,7 +4,10 @@ enviado. Aqui mora TODA a lógica fiscal (docs/conhecimento-fiscal.md §4).
 Regras-chave (E-codes):
   • cTribNac (6 díg) + cTribMun — sem o municipal, E0312.
   • prestador=emitente (tpEmit=1): NÃO enviar nome nem endereço — E0128/E0121.
-  • Simples: usar totTrib/pTotTribSN, nunca indTotTrib — E0712.
+  • ME/EPP optante do Simples (opSimpNac=3): totTrib/pTotTribSN, nunca indTotTrib — E0712.
+  • MEI (opSimpNac=2): ISENTO do valor aproximado dos tributos (Decreto 8.264/2014) →
+    totTrib/indTotTrib=0 (NÃO pTotTribSN), regTrib SEM regApTribSN, e SEM o bloco tribFed
+    (E0676: MEI não pode preencher tributos federais — recolhe no DAS-SIMEI) — como o EmissorWeb.
   • totTrib é sempre obrigatório — E1235.
   • verAplic ≤ 20 chars — E1235.
   • fuso America/Sao_Paulo ao gerar dhEmi — E0008 (módulo relogio).
@@ -133,7 +136,9 @@ def montar_dps(
         _el(prest, "IM", documentos.digitos(p.inscricao_municipal))
     reg = _el(prest, "regTrib")
     _el(reg, "opSimpNac", str(r.opSimpNac))
-    if r.regApTribSN is not None:
+    # regApTribSN (regime de apuração do SN) só se aplica a ME/EPP optante (opSimpNac=3).
+    # MEI (opSimpNac=2) NÃO o informa — o EmissorWeb do gov o omite; incluí-lo destoa da nota real.
+    if r.opSimpNac != 2 and r.regApTribSN is not None:
         _el(reg, "regApTribSN", str(r.regApTribSN))
     _el(reg, "regEspTrib", str(r.regEspTrib))
 
@@ -180,11 +185,20 @@ def montar_dps(
     tm = _el(trib, "tribMun")
     _el(tm, "tribISSQN", str(s.tributos.get("tribISSQN", 1)))
     _el(tm, "tpRetISSQN", str(s.tributos.get("tpRetISSQN", 1)))
-    tf = _el(trib, "tribFed")
-    pc = _el(tf, "piscofins")
-    _el(pc, "CST", str(s.tributos.get("piscofins_cst", "08")))
+    # tribFed (PIS/COFINS): PROIBIDO para o MEI — E0676 ("não é permitido preencher os tributos
+    # federais quando o emitente é MEI"). O MEI recolhe tudo no DAS-SIMEI. Só ME/EPP e Não Optante
+    # enviam tribFed. (tribFed é minOccurs=0 no XSD; a nota real do MEI no EmissorWeb sai sem ele.)
+    if r.opSimpNac != 2:
+        tf = _el(trib, "tribFed")
+        pc = _el(tf, "piscofins")
+        _el(pc, "CST", str(s.tributos.get("piscofins_cst", "08")))
     tt = _el(trib, "totTrib")
-    if r.opSimpNac == 1:   # Não Optante usa indTotTrib; Simples (MEI/ME-EPP) usa pTotTribSN
+    # totTrib (choice) depende do regime tributário:
+    #  • Não Optante (1) e MEI (2): indTotTrib. O MEI é ISENTO de declarar o valor aproximado dos
+    #    tributos (Decreto 8.264/2014) — a nota real do EmissorWeb sai com <indTotTrib>0</indTotTrib>.
+    #  • ME/EPP optante do Simples (3): pTotTribSN (% total aprox. — Lei da Transparência).
+    #    E0712 PROÍBE indTotTrib para ME/EPP.
+    if r.opSimpNac in (1, 2):
         _el(tt, "indTotTrib", str(s.tributos.get("indTotTrib", 0)))
     else:
         _el(tt, "pTotTribSN", str(s.tributos.get("pTotTribSN", "0.00")))
