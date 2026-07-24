@@ -80,11 +80,10 @@ class Prestador:
 class Servico:
     codigo_municipio_prestacao: str   # IBGE do local da prestação
     cTribNac: str                     # 6 dígitos (LC116)
-    cTribMun: str = ""                # desdobro municipal — OPCIONAL (é minOccurs=0 no XSD). A maioria
-                                      # dos municípios administra a combinação cTribNac+cTribMun (RJ, Ubatuba),
-                                      # mas alguns NÃO usam desdobro e REJEITAM o campo: Curitiba devolve
-                                      # E0315 ("não é permitido informar 000") — nesses casos, deixar VAZIO
-                                      # e o dps.py omite o elemento (as notas reais de Curitiba não têm cTribMun).
+    cTribMun: str = ""                # desdobro municipal — OPCIONAL (minOccurs=0 no XSD)
+    # A maioria administra o par cTribNac+cTribMun (RJ, Ubatuba), mas alguns NÃO usam desdobro e
+    # REJEITAM o campo: Curitiba devolve E0315 ("não é permitido informar 000"). Nesses casos,
+    # deixar VAZIO — o dps.py omite o elemento (as notas reais de Curitiba não têm cTribMun).
     descricao_padrao: str = "Serviço Prestado"
     tributos: dict[str, Any] = field(default_factory=dict)  # ex.: {"pTotTribSN": "6.00"}
 
@@ -173,8 +172,8 @@ class ClienteConfig:
         # cTribMun é OPCIONAL (minOccurs=0 no XSD). NÃO validamos presença: a maioria dos
         # municípios administra a combinação cTribNac+cTribMun (e o SEFIN devolve E0312 quando falta
         # onde é exigido — a autoridade é o SEFIN), mas há municípios que NÃO usam desdobro e
-        # REJEITAM o campo (Curitiba: E0315 "não é permitido informar 000"). Nesses, deixa-se vazio e
-        # o dps.py omite o elemento. Um cTribMun faltante onde o município exige vira E0312 no envio.
+        # REJEITAM o campo (Curitiba: E0315 "não é permitido informar 000"). Nesses, deixa-se
+        # vazio e o dps.py omite o elemento. Faltar onde o município exige vira E0312 no envio.
         if not (s.codigo_municipio_prestacao.isdigit()
                 and len(s.codigo_municipio_prestacao) == 7):
             problemas.append(
@@ -189,8 +188,8 @@ class ClienteConfig:
             ptot = s.tributos.get("pTotTribSN")
             if ptot is None or str(ptot).strip() == "":
                 problemas.append(
-                    f"E0712/E1235: prestador é ME/EPP optante do Simples (opSimpNac=3) → "
-                    f"'pTotTribSN' é obrigatório em servico.tributos"
+                    "E0712/E1235: prestador é ME/EPP optante do Simples (opSimpNac=3) → "
+                    "'pTotTribSN' é obrigatório em servico.tributos"
                 )
             else:
                 try:

@@ -9,7 +9,6 @@ from __future__ import annotations
 
 from pynfsenacional import documentos
 
-
 # Exemplo canônico da NT/RFB: 12.ABC.345/01DE-35 (DV 35, ASCII-48, mód-11).
 CNPJ_ALFA = "12ABC34501DE35"
 
@@ -40,6 +39,7 @@ def test_cpf_intocado():
 
 def test_dps_emite_cnpj_alfanumerico_do_prestador():
     from conftest import CONFIG_VALIDA
+
     from pynfsenacional import dps
     from pynfsenacional.config import ClienteConfig
 

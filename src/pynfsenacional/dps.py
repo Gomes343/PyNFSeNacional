@@ -195,7 +195,7 @@ def montar_dps(
     tt = _el(trib, "totTrib")
     # totTrib (choice) depende do regime tributário:
     #  • Não Optante (1) e MEI (2): indTotTrib. O MEI é ISENTO de declarar o valor aproximado dos
-    #    tributos (Decreto 8.264/2014) — a nota real do EmissorWeb sai com <indTotTrib>0</indTotTrib>.
+    #    tributos (Decreto 8.264/2014) — a nota real do EmissorWeb sai com indTotTrib=0.
     #  • ME/EPP optante do Simples (3): pTotTribSN (% total aprox. — Lei da Transparência).
     #    E0712 PROÍBE indTotTrib para ME/EPP.
     if r.opSimpNac in (1, 2):
