@@ -125,7 +125,8 @@ class Certificado:
         """CNPJ/CPF do titular, extraído do CN ICP-Brasil ('NOME:DOC'), se houver."""
         cn = self.titular
         if ":" in cn:
-            doc = "".join(ch for ch in cn.rsplit(":", 1)[1] if ch.isdigit())
+            # CNPJ alfanumérico (NT 2025.001): preserva letras do doc (e-CPF segue só dígitos).
+            doc = "".join(ch for ch in cn.rsplit(":", 1)[1] if ch.isalnum()).upper()
             return doc or None
         return None
 

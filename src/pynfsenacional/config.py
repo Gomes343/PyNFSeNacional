@@ -210,7 +210,10 @@ def validar_tomador(tomador: dict[str, Any] | None) -> list[str]:
     documento válido (mód-11)."""
     if not tomador:
         return []
-    doc = documentos.digitos(tomador.get("cpf_cnpj") or tomador.get("cpf") or tomador.get("cnpj"))
+    # CNPJ alfanumérico do tomador: preserva letras (CPF, só dígitos, sai igual).
+    doc = documentos.norm_documento(
+        tomador.get("cpf_cnpj") or tomador.get("cpf") or tomador.get("cnpj")
+    )
     if not doc:
         return []  # sem documento → tratado como não identificado (omite <toma>)
 

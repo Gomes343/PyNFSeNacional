@@ -48,7 +48,7 @@ def id_dps(cfg: ClienteConfig, numero: str, serie: str = "1") -> str:
     """`Id` da DPS (45 chars) — porta `IdGenerator::generateDpsId` do PHP.
     Formato: DPS + IBGE(7) + tipoInscr(1: 2=CNPJ/1=CPF) + inscrFed(14) + série(5) + nDPS(15).
     Determinístico — base da idempotência (verificarDps)."""
-    doc = documentos.digitos(cfg.prestador.cnpj)
+    doc = documentos.norm_documento(cfg.prestador.cnpj)  # CNPJ alfanumérico: preserva letras
     tipo = "2" if len(doc) == 14 else "1"
     return (
         "DPS"
@@ -128,7 +128,7 @@ def montar_dps(
     # gera E1235 (falha de schema) para qualquer prestador que tenha IM — pegado pelo diff
     # byte-a-byte contra a implementação PHP de referência (prestadores que têm IM).
     prest = _el(inf, "prest")
-    _el(prest, "CNPJ", documentos.digitos(p.cnpj))
+    _el(prest, "CNPJ", documentos.norm_documento(p.cnpj))  # CNPJ alfanumérico: preserva letras
     if p.inscricao_municipal:
         _el(prest, "IM", documentos.digitos(p.inscricao_municipal))
     reg = _el(prest, "regTrib")
@@ -143,7 +143,8 @@ def montar_dps(
     # fone/email só entram quando vierem nos dados → sem eles o XML é IDÊNTICO ao de antes (o
     # golden, cujo tomador não tem endereço, segue bate-byte). Espelha o buildTomador do PHP.
     tom = tomador or {}
-    doc = documentos.digitos(tom.get("cpf_cnpj") or tom.get("cpf") or tom.get("cnpj"))
+    # CNPJ alfanumérico do tomador: preserva letras; CPF (só dígitos) sai igual.
+    doc = documentos.norm_documento(tom.get("cpf_cnpj") or tom.get("cpf") or tom.get("cnpj"))
     if doc:
         toma = _el(inf, "toma")
         _el(toma, "CNPJ" if len(doc) == 14 else "CPF", doc)
