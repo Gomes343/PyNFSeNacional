@@ -3,6 +3,25 @@
 Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/);
 versionamento [SemVer](https://semver.org/lang/pt-BR/).
 
+## [0.4.0] - 2026-07-24
+
+### Adicionado
+- **MEI (`opSimpNac=2`): DPS distinta do ME/EPP (`opSimpNac=3`).** O MEI é **isento** do valor
+  aproximado dos tributos (**Decreto 8.264/2014**) e recolhe os federais no DAS-SIMEI, então a DPS
+  difere: `totTrib` usa **`indTotTrib=0`** (não `pTotTribSN`), `regTrib` **omite** `regApTribSN`, e
+  **não** emite o bloco `tribFed` (PIS/COFINS) — senão **E0676**. Chaveamento por `opSimpNac` no
+  `dps.py`; o validador só exige `pTotTribSN` quando `opSimpNac==3`. `opSimpNac=1` (Não Optante)
+  também usa `indTotTrib`. Descoberto no XML real do EmissorWeb de um MEI (Ibirité/MG). Regressões
+  `test_mei_usa_indtottrib_e_omite_regaptribsn` e `test_mei_nao_exige_ptottribsn`. Ver
+  `docs/conhecimento-fiscal.md` §3 "MEI".
+- **CNPJ alfanumérico (NT 2025.001):** a DPS **preserva as letras** do CNPJ (não força só dígitos) e
+  o cálculo do DV usa o valor ASCII−48 de cada caractere. Cobre emitente e tomador. Vale a partir de
+  jul/2026 (primeiros CNPJ alfanuméricos). Regressões em `test_cnpj_alfanumerico.py`.
+
+### Alterado
+- **`cTribMun` agora é OPCIONAL** (`minOccurs=0` no XSD): municípios sem desdobro (ex.: **Curitiba**)
+  **rejeitam** o campo. Config sem `cTribMun` não gera mais E0312 — o `dps.py` **omite** o elemento.
+
 ## [0.3.0] - 2026-07-17
 
 ### Alterado
