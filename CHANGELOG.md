@@ -3,6 +3,61 @@
 Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/);
 versionamento [SemVer](https://semver.org/lang/pt-BR/).
 
+## [0.5.0] - 2026-08-19
+
+> Release do **conhecimento de produção**: o que meses emitindo nota real ensinaram sobre
+> Inscrição Municipal, CEP do tomador e CST de PIS/COFINS — mais as correções que esse
+> conhecimento revelou no código.
+
+### Corrigido
+- **`<IM>` vazia no XML.** `prestador.inscricao_municipal` com string em branco (`""`, `"   "`)
+  era "verdadeira" e emitia um elemento `<IM></IM>` **vazio** — falha de schema. Agora a IM só
+  entra quando sobra **dígito** depois da limpeza (regressão
+  `test_prestador_sem_im_omite_o_elemento`).
+
+### Adicionado
+- **A validação recusa Inscrição Municipal "de enfeite"** (`0000`, `ISENTO`, qualquer valor sem
+  dígito significativo). Preencher a IM para "satisfazer o campo" ou é recusado pelo SEFIN, ou —
+  pior — **passa**, e vira nota fiscal real com dado falso. Quando o CNC do município não tem IM
+  para aquele CNPJ, o certo é deixar **vazio**.
+- **A omissão do endereço do tomador deixou de ser silenciosa.** O bloco `<end>` é atômico
+  (tudo-ou-nada): faltando `cMun`/`CEP`/logradouro/bairro, ele é descartado inteiro. Agora isso
+  gera um **WARNING** dizendo **quais campos faltaram** — sem vazar valor nenhum. Guarda calada é
+  bug com cara de sucesso: a nota saía "com sucesso" sem o endereço que o chamador achou que
+  tinha enviado.
+- **`servico.tributos.piscofins_cst` documentado** (default `"08"` = Operação sem Incidência;
+  `"00"` = Nenhum). Já era configurável, mas não estava em lugar nenhum do schema publicado.
+
+### Documentação
+Quatro seções novas em `docs/conhecimento-fiscal.md`, todas nascidas de emissão real:
+- **§10 — Inscrição Municipal: quem decide é o CNC, por CNPJ.** Não existe "o município X exige
+  IM": o Cadastro Nacional de Contribuintes responde **por CNPJ**, e dois prestadores da mesma
+  cidade podem exigir coisas opostas (**E0116** × **E0120** × nenhum erro — os três casos
+  acontecem). Inclui o alerta de que **homologação mente** sobre IM/CNC — só produção responde a
+  verdade — e que nem todo município existe em homologação.
+- **§11 — E0240, o CEP que passa em toda validação e não existe.** Quase nunca é digitação: é o
+  **CEP geral do município** (`xxxxx-000`) herdado de cadastro criado a partir da consulta de
+  CNPJ. Como confirmar, como achar o certo e por que a validação de **formato** não pega.
+- **§12 — CST de PIS/COFINS:** `08` (default, aceito em produção) × `00`, e por que o critério é o
+  XML que o **próprio contribuinte** já emitiu — não se propaga de um prestador para outro.
+- **§13 — Método: o XML que o contribuinte já emitiu é a fonte da verdade.** De notas antigas
+  saem, provados, `cTribNac`+`cTribMun`, IM, séries em uso, CST e regime. Mais a disciplina da
+  **nota canário** quando o município não existe em homologação.
+
+E ainda:
+- **§5 ganhou "quando o prestador já emitia por outro sistema"**: como o `Id` da DPS inclui a
+  série, começar o contador em 1 numa série já usada **repete um `Id` existente** e o SEFIN
+  devolve a nota **já emitida** — a idempotência funcionando contra você. Solução: **série
+  dedicada**.
+- Tabela de erros do §4 com **E0116, E0120, E0240, E0315 e E0676**.
+- README: `cTribMun` deixou de ser descrito como obrigatório (é opcional desde a 0.4.0),
+  exemplos de config anotados com IM/`piscofins_cst`/série, e uma seção **Origem** creditando a
+  operação real que sustenta este projeto.
+
+### Interno
+- Sanitização de repositório público: nomes internos da implementação de referência saíram dos
+  comentários, e os dados de teste passaram a ser **100% fictícios** (nenhuma entidade real).
+
 ## [0.4.0] - 2026-07-24
 
 ### Adicionado
