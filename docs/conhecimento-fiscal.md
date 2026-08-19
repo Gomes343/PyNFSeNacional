@@ -2,8 +2,12 @@
 
 > Este documento é o **coração** do projeto: o conhecimento fiscal ganho a sangue emitindo notas
 > reais no Sistema Nacional NFS-e. A implementação Python muda de linguagem, mas **estas regras
-> não mudam** — são do SEFIN, não da linguagem. Originado de uma implementação de referência em PHP
-> (privada) que já emite em produção; aqui está destilado e independente de lib.
+> não mudam** — são do SEFIN, não da linguagem.
+>
+> Cada regra aqui foi **paga com nota real**: nasceu na operação diária da
+> [**GT Contabilidade**](https://gtcontabilidade.com), escritório contábil que emite NFS-e pelo
+> padrão nacional para clientes em municípios diferentes, e que decidiu publicar o que aprendeu em
+> vez de guardar. Nenhum dado de contribuinte aparece aqui — só a regra, que serve a todo mundo.
 
 ---
 
@@ -120,7 +124,7 @@ Cada prestador é descrito por um JSON. Campos marcados ★ são **obrigatórios
 | `cTribNac` (6 díg) | item da LC116 da atividade (mesmo código usado no portal hoje) |
 | `cTribMun` (desdobro municipal) | o que o município administra p/ aquele `cTribNac` (§4) |
 | `pTotTribSN` (% Simples) | alíquota efetiva do Simples (contabilidade) |
-| Inscrição Municipal | só se o município exigir |
+| Inscrição Municipal | **o CNC decide, por CNPJ** — não é "por município" (§10) |
 
 ### Pego automaticamente pelo SEFIN (NÃO enviar)
 - **Nome e endereço do prestador** (do cadastro nacional) → enviar dá **E0128/E0121**.
@@ -161,6 +165,11 @@ A regra de cada erro é **fiscal**, vale para qualquer linguagem. A "Solução" 
 | **E1235** | "Pattern TSCodTribNac" | `cTribNac` com 9 díg | `cTribNac` é **6 díg**; o desdobro vai em `cTribMun` |
 | **E1235** | "Falha no esquema (verAplic)" | `verAplic` > 20 chars | **`verAplic` ≤ 20** caracteres |
 | **E1235** | "`toma` incompleto (expected CAEPF, IM, xNome)" | tomador só com CPF/CNPJ | tomador identificado **EXIGE nome** (`xNome`); ver §7 |
+| **E0116** | "a IM deve ser informada… conforme CNC do município emissor" | o CNPJ **tem** Inscrição Municipal no CNC e a DPS foi sem ela | informar a IM do prestador — ver §10 |
+| **E0120** | "IM não deve ser informada, pois não existem informações complementares no CNC" | mandou IM onde o CNC **não** tem esse CNPJ (ou o município não usa CNC) | **omitir** a IM (vazio/`null`) — ver §10 |
+| **E0315** | "não é permitido informar 000" (`cTribMun`) | município **sem desdobro** municipal | **omitir** `cTribMun` (é `minOccurs=0`) |
+| **E0676** | "não é permitido preencher os tributos federais quando o emitente é MEI" | bloco `tribFed` numa DPS de **MEI** | MEI recolhe no DAS-SIMEI → **omitir `tribFed`** (§3) |
+| **E0240** | "o CEP informado para o endereço nacional do tomador não existe ou não pertence ao município" | quase nunca é digitação: é o **CEP geral do município** (`xxxxx-000`) herdado de cadastro automático | §11 |
 
 ### Código de serviço: `cTribNac` + `cTribMun`
 O código do portal no formato `00.00.00.000` decompõe em:
@@ -180,6 +189,25 @@ município + código + data) para descobrir/confirmar o `cTribMun` — confirmar
   um **contador interno** — pode auto-incrementar livremente, sem relação com o número fiscal.
 - Implementação: **contador por ambiente** (`numero_<id>_<homologacao|producao>.txt`), incrementa só
   quando a nota foi de fato emitida. Testes em homologação **não** consomem a numeração de produção.
+
+### ★ Quando o prestador JÁ emitia por outro sistema — use uma série dedicada
+
+O `Id` da DPS é `município + CNPJ + **série** + nDPS`. Se o CNPJ já emitiu pelo portal do governo (ou
+por outro software) com **série 1, nDPS 1..N**, começar nosso contador em 1 na mesma série **repete um
+`Id` que já existe** — e o SEFIN, corretamente, devolve a nota **já emitida** em vez de uma nova. Não é
+erro: é a idempotência funcionando contra você. E é traiçoeiro porque *parece* que emitiu.
+
+Duas coisas a fazer antes da primeira nota de um prestador que já emitia:
+
+1. **Descobrir as séries que ele já usa** — a caixa **DF-e** do prestador entrega os XMLs das notas
+   emitidas, com série e número reais (§13). Na prática aparecem séries "de sistema" bem fora do óbvio
+   (900, 70000…), não só a 1.
+2. **Escolher uma série DEDICADA** que ele não use, e fixá-la na config. Assim a numeração da sua
+   emissão fica **independente** da que o contribuinte gera por fora, para sempre — inclusive se ele
+   voltar a emitir pelo portal no meio do mês.
+
+> O contador local é por **(prestador, ambiente)** — ele **não** sabe de série. Trocar a série sem
+> zerar/segregar o contador é outra forma de colidir.
 
 ---
 
@@ -242,3 +270,125 @@ Quando entrar em escopo (um prestador de Regime Regular, ou mudança do SEFIN), 
   `cryptography` (`load_key_and_certificates`) lê o `.pfx` direto; se topar com o mesmo bloqueio de
   cifra legada, é o ponto a tratar (não é "senha errada").
 - **QR Code / PNG** no DANFSe: garantir as deps da lib de PDF.
+
+---
+
+## 10. ★ Inscrição Municipal do prestador: quem decide é o **CNC**, por **CNPJ**
+
+Esta é a regra que mais custou tempo — e a que quase toda documentação erra, porque a intuição diz
+"o município X exige IM". **Não existe isso.** Quem responde é o **CNC** (Cadastro Nacional de
+Contribuintes) e ele responde **por CNPJ**: dois prestadores da **mesma cidade** podem exigir coisas
+**opostas**.
+
+São **três** situações, e todas as três aparecem na prática:
+
+| Situação | `inscricao_municipal` | Se errar |
+|---|---|---|
+| Município **sem** cadastro no CNC | **vazio / `null`** — não mandar | **E0120** — "IM não deve ser informada, pois não existem informações complementares no CNC" |
+| Município com CNC **e o CNPJ tem IM lá** | **mandar** a IM | **E0116** — "a IM deve ser informada… conforme CNC do município emissor" |
+| Município com CNC, **mas aquele CNPJ não tem IM lá** | **vazio / `null`** — não mandar | — (emite limpo) |
+
+A terceira linha é a que quebra a intuição: o município está anotado como "exige IM", e mesmo assim
+**aquele** CNPJ emite sem. Por isso a config trata a IM como **opcional** e o montador **omite** o
+elemento quando ela vem vazia (regressão `test_prestador_sem_im_omite_o_elemento`).
+
+### Como descobrir sem chutar
+1. **Leia o XML que o próprio contribuinte já emitiu** para aquele CNPJ (§13). Se o `<prest>` das
+   notas dele leva `<IM>`, mande; se não leva, não mande. O portal é o espelho do CNC — isso é fato
+   sobre o que o município **aceitou**, não suposição.
+2. Só então, se ainda houver dúvida, a **nota canário** (§13).
+
+> ⚠️ **Homologação MENTE sobre IM/CNC.** O ambiente de produção restrita chega a devolver **E0116
+> com e sem** a IM, o que parece "bloqueio externo" e manda você caçar o problema no lugar errado.
+> Para **IM, CNC e adesão do município**, o único ambiente que responde a verdade é **produção**.
+> (No mesmo espírito: **nem todo município existe em homologação** — para muitos, não há teste
+> possível antes da nota real.)
+
+> ⚠️ **Nunca preencha a IM "de enfeite"** (`0000`, `ISENTO`, o CNPJ repetido…) só para satisfazer o
+> campo. Ou é recusado — ou, muito pior, **passa**, e você acaba de emitir uma nota fiscal **real com
+> dado falso**. Omitir é sempre mais seguro que inventar; a validação desta biblioteca **recusa**
+> IM sem dígito significativo justamente por isso. Se vier E0116 de verdade, peça a IM à prefeitura.
+
+---
+
+## 11. E0240 — o CEP que passa em toda validação e **não existe**
+
+> `[E0240] O CEP informado para o endereço nacional do tomador do serviço não existe ou não pertence
+> ao município do endereço do tomador`
+
+O reflexo é procurar erro de digitação na mensagem que originou a nota. Quase nunca é isso —
+**ninguém digitou CEP**. O caminho real costuma ser este:
+
+1. O tomador é novo e o cadastro dele é criado **automaticamente** a partir da consulta de CNPJ.
+2. A Receita guarda, para muitas empresas, o **CEP geral do município** (o `xxxxx-000`) em vez do CEP
+   da rua.
+3. Esse CEP **não existe** como CEP de logradouro: serviços de consulta (ViaCEP e afins) devolvem
+   erro para ele, e a **SEFIN recusa** a DPS.
+4. Como o cadastro só é reconsultado quando o tomador está **sem** endereço, o valor ruim fica
+   gravado e a nota falha **de novo** a cada tentativa — sem nada de útil na mensagem original.
+
+**Confirmar em 10 segundos:** consultar o CEP (ex.: `https://viacep.com.br/ws/<cep>/json/`) — se
+voltar erro, é isso. **Achar o certo:** busca por UF + cidade + logradouro que a própria Receita
+informou, casando pelo **bairro**; com mais de um candidato em bairros diferentes, **não chute**.
+
+**Por que a validação local não pega:** a validação desta biblioteca é de **formato** (CEP com 8
+dígitos, `cMun` com 7, logradouro e bairro não vazios) — e o CEP geral passa em todos esses testes.
+Validar **existência** exigiria rede, o que uma lib de emissão não deve fazer no meio do envio. A
+contramedida é de operação: **varrer os CEPs cadastrados** contra um serviço de consulta e corrigir
+**antes** de precisar emitir.
+
+> Relacionado: o endereço do tomador é **bloco atômico** (§7) — faltando um obrigatório, a biblioteca
+> **omite o endereço inteiro** e **registra um WARNING** dizendo quais campos faltaram (nunca os
+> valores). Guarda silenciosa é bug com cara de sucesso.
+
+---
+
+## 12. PIS/COFINS: o CST default e o que o portal do contribuinte emite
+
+No bloco `valores/trib/tribFed/piscofins/CST`:
+
+| CST | Significado |
+|---|---|
+| `00` | Nenhum |
+| `08` | Operação sem Incidência |
+
+O default desta biblioteca é **`08`**, e ele **é aceito** pelo SEFIN — há muita nota real em produção
+emitida assim. Mas existem contribuintes cujo **próprio portal** emite **`00`** em centenas de notas.
+Nenhum dos dois é "o certo" universal: **o critério é o XML que aquele contribuinte já emitiu** (§13).
+
+Configurável por prestador em `servico.tributos.piscofins_cst` (`"00"` ou `"08"`). Não propague o
+valor de um contribuinte para os outros — cada um pede a sua conferência.
+
+> **MEI é exceção total:** não emite o bloco `tribFed` (nem PIS/COFINS), sob pena de **E0676** — ele
+> recolhe os federais no DAS-SIMEI (§3).
+
+---
+
+## 13. ★ Método: o XML que o contribuinte **já emitiu** é a fonte da verdade
+
+A maior parte dos erros de configuração some quando se para de perguntar "qual código a atividade
+dele usa?" e se passa a **ler as notas que ele já emitiu**. A caixa **DF-e** (distribuição de
+documentos fiscais eletrônicos) entrega esses XMLs para o próprio contribuinte.
+
+De um punhado de XMLs antigos saem, prontos e provados, quase todos os campos que travam a primeira
+emissão:
+
+| Campo | O que o XML antigo prova |
+|---|---|
+| `cTribNac` + `cTribMun` | a combinação que **aquele município administra** (evita E0312/E0315) |
+| `<IM>` no `<prest>` | se o CNC tem IM para aquele CNPJ (§10) |
+| `serie` / `nNFSe` | quais séries ele já usa — para escolher uma **dedicada** (§5) |
+| `piscofins/CST` | `00` × `08` conforme o próprio emitente (§12) |
+| `regTrib` | `opSimpNac` / `regApTribSN` / `regEspTrib` reais |
+
+Isso vale mais que a resposta de qualquer pessoa envolvida: é o que o município **aceitou**, não o
+que alguém acredita. Quando o dado do XML contradisser o que foi informado, **o XML vence** — já
+aconteceu de o desdobro municipal "de cabeça" estar errado e o correto vir das próprias notas.
+
+### A nota canário (quando não há homologação)
+Para município que **não existe em homologação** (§10), o único teste possível é uma nota **real**:
+valor mínimo, tomador conhecido, **uma só**. Se emitir, você aprendeu a verdade sobre IM/CNC/adesão
+com a autoridade que importa. Ela é **documento fiscal**: cancele pelo caminho que o município aceita
+(direto ou por pedido de análise) e **registre** o que foi feito. Antes de qualquer canário, valide
+a DPS localmente e compare-a **campo a campo** com uma nota antiga do mesmo contribuinte — o canário
+é para confirmar o que você já acha que sabe, não para descobrir no escuro.

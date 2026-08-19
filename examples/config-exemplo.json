@@ -23,7 +23,8 @@
     "cTribMun": "001",
     "descricao_padrao": "Serviço Prestado",
     "tributos": {
-      "pTotTribSN": "6.00"
+      "pTotTribSN": "6.00",
+      "piscofins_cst": "08"
     }
   },
   "dados_nota": {

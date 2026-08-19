@@ -19,7 +19,9 @@
     "cnpj": "00000000000000",                 // ★ 14 dígitos
     "codigo_municipio": "0000000",            // ★ IBGE 7 díg do município do emitente
     "uf": "RJ",
-    "inscricao_municipal": null,              //   só se o município exigir
+    "inscricao_municipal": null,              //   OPCIONAL — quem decide é o CNC, POR CNPJ:
+                                              //   tem IM no CNC? mande (senão E0116). Não tem?
+                                              //   deixe null (mandar dá E0120). Nunca de enfeite
     "regime": {                               // ★ regime tributário
       "opSimpNac": 3,                         //   1=Não Optante · 2=MEI · 3=Optante ME/EPP
       "regApTribSN": 1,                       //   apuração do SN (se optante)
@@ -31,15 +33,21 @@
   "servico": {
     "codigo_municipio_prestacao": "0000000",  // ★ IBGE do local da prestação
     "cTribNac": "041601",                     // ★ 6 dígitos (LC116) — exemplo: psicologia
-    "cTribMun": "001",                        // ★ desdobro municipal (sem ele → E0312)
+    "cTribMun": "001",                        //   desdobro municipal: obrigatório onde o
+                                              //   município usa (senão E0312); onde NÃO usa,
+                                              //   o campo é rejeitado (E0315) → deixe ""
     "descricao_padrao": "Serviço Prestado",
     "tributos": {
-      "pTotTribSN": "6.00"                    // ★ se Simples: % efetiva do Simples Nacional
-    }
+      "pTotTribSN": "6.00",                   // ★ se Simples ME/EPP: % efetiva do Simples
+      "piscofins_cst": "08"                   //   CST do PIS/COFINS: "08"=Operação sem Incidência
+    }                                         //   (default) · "00"=Nenhum. Confira no XML que o
+                                              //   próprio contribuinte já emitiu (MEI não usa)
   },
 
   "dados_nota": {                             // EXEMPLO p/ teste manual; em uso real os dados
     "serie": "1",                             //   da emissão (valor/descrição/tomador) sobrescrevem
+                                              //   ⚠️ se o CNPJ JÁ emitia por outro sistema, use uma
+                                              //   série DEDICADA (senão o Id da DPS colide)
     "numero": "1",                            //   semente do contador nDPS
     "valor": 1.00,
     "descricao": "Serviço de exemplo",

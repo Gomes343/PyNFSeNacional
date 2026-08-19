@@ -8,8 +8,9 @@
 ## O que é
 
 Pacote Python público (MIT) que emite **NFS-e pela API SEFIN Nacional** (DPS) e gera o **DANFSe
-localmente**. Vai para GitHub/PyPI. Feito por um contador, para a comunidade que vai bater na
-obrigatoriedade nacional (~set/2026).
+localmente**. Publicado no GitHub e no PyPI. Feito por um contador da **GT Contabilidade**
+(https://gtcontabilidade.com) — que emite NFS-e nacional em produção e abriu o conhecimento — para
+a comunidade que vai bater na obrigatoriedade nacional (~set/2026).
 
 ## Origem
 
@@ -64,8 +65,8 @@ ponta a ponta: **validar → montar DPS → assinar → transporte mTLS → Nota
 - `dps.py` — `montar_dps`/`id_dps`; o C14N do `infDPS` bate **byte-a-byte** com o PHP (golden). ✅
   - **Fix 25/06/2026:** a `<IM>` (Inscrição Municipal) saía DEPOIS do `<regTrib>` dentro de `<prest>`,
     violando a ordem do XSD (AnexoI) → **E1235** para todo prestador COM inscrição municipal. O golden
-    (config sem IM) não pegava; pegou o **harness de paridade** do consumidor (03-nfse), que diffa o
-    infDPS contra o motor PHP de produção. Corrigido (IM antes do regTrib) + regressão
+    (config sem IM) não pegava; pegou o **harness de paridade** do sistema consumidor, que diffa o
+    infDPS contra a implementação de referência em PHP. Corrigido (IM antes do regTrib) + regressão
     `test_inscricao_municipal_vem_antes_do_regtrib`. ✅ Publicado na **v0.2.0** (junto com o bloco de
     endereço do tomador); a v0.1.0 do PyPI tem o bug da IM — pinar **≥0.2.0**.
   - **Feature 30/06/2026:** o `<toma>` passou a emitir os campos OPCIONAIS do tomador — `IM`,
@@ -80,6 +81,14 @@ ponta a ponta: **validar → montar DPS → assinar → transporte mTLS → Nota
     (`dps.py` `regTrib`/`totTrib`) + validador só exige `pTotTribSN` p/ `opSimpNac==3`. Regra em
     `docs/conhecimento-fiscal.md §3 "MEI"`; testes `test_mei_usa_indtottrib_e_omite_regaptribsn` e
     `test_mei_nao_exige_ptottribsn`. Descoberto no XML real do EmissorWeb de um MEI (Ibirité/MG).
+  - **v0.5.0 (19/08/2026) — a IM é OPCIONAL de verdade.** Quem decide se a `<IM>` do prestador vai
+    na DPS é o **CNC do município, POR CNPJ** (não por cidade): tem IM no CNC → mandar (senão
+    **E0116**); não tem → **omitir** (mandar dá **E0120**). Dois prestadores da MESMA cidade podem
+    exigir coisas opostas. Bug corrigido no caminho: IM com string em branco (`"   "`) emitia
+    `<IM></IM>` **vazio** — agora só entra se sobrar dígito (`test_prestador_sem_im_omite_o_elemento`),
+    e o `validar()` **recusa** IM sem dígito significativo (IM de enfeite vira nota real com dado
+    falso). A omissão atômica do endereço do tomador passou a **logar WARNING** com os nomes dos
+    campos que faltaram (nunca os valores). Regra completa em `docs/conhecimento-fiscal.md` §10–§13.
 - `assinatura.py` — `assinar_dps` via `erpbrasil.assinatura`; mesmo `DigestValue` do gabarito. ✅
 - `sefin.py` — transporte mTLS (`requests-pkcs12`, P12 direto), `POST /nfse`, `verificarDps`.
   **mTLS validado ao vivo** em homologação (handshake + `HEAD /dps`, read-only). ✅
@@ -94,12 +103,14 @@ SEFIN devolveu o `nNFSe` + a chave de 50 díg e o DANFSe foi gerado localmente. 
 deps permissivas; a `BrazilFiscalReport` (LGPL-3.0 pelo LICENSE/README upstream — o classifier AGPL do
 pyproject deles parece engano) só entra para gerar o PDF. Import lazy em `danfse.py`.
 
-**Falta (pré-publicação):** (1) criar o repo no GitHub + reservar o nome no PyPI; (2) endurecimento a
-partir de emissões reais; (3) reportar o classifier de licença errado upstream.
+**Publicado:** repo em github.com/Gomes343/PyNFSeNacional e pacote no PyPI (`PyNFSeNacionalGT`) —
+release por tag `vX.Y.Z` (PyPI via Trusted Publishing + Release do GitHub, sem token no repo).
+**Em aberto:** (1) endurecimento a partir de mais emissões reais; (2) grupo IBS/CBS na DPS;
+(3) reportar o classifier de licença errado upstream.
 
 Tooling: `pip install -e ".[dev]"` (deps instalam no 3.10–3.14), lock com hashes
 (`requirements-dev.txt`), CI (`.github/workflows/ci.yml`), release por tag (`release.yml`).
-Testes: `pytest` (67, +2 skip locais), `ruff check .`, `mypy --strict` — tudo verde.
+Testes: `pytest` (85 passed, +2 skip locais), `ruff check .`, `mypy --strict` — tudo verde.
 
 ## Regras
 

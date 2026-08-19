@@ -4,8 +4,9 @@
 
 **Emissão de NFS-e pela API do Sistema Nacional (SEFIN) e geração do DANFSe — em Python.**
 
-Feito por um contador, para contadores e desenvolvedores que precisam emitir nota fiscal de serviço
-no **padrão nacional** sem depender de robô de navegador nem da API de PDF do governo.
+Feito por um contador da **[GT Contabilidade](https://gtcontabilidade.com)**, para contadores e
+desenvolvedores que precisam emitir nota fiscal de serviço no **padrão nacional** sem depender de
+robô de navegador nem da API de PDF do governo.
 
 [![CI](https://github.com/Gomes343/PyNFSeNacional/actions/workflows/ci.yml/badge.svg)](https://github.com/Gomes343/PyNFSeNacional/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/PyNFSeNacionalGT?color=blue)](https://pypi.org/project/PyNFSeNacionalGT/)
@@ -67,8 +68,9 @@ pip install "PyNFSeNacionalGT[danfse]"
 
 > Requer **Python 3.10+**. No PyPI o pacote se chama **`PyNFSeNacionalGT`** (o nome `PyNFSeNacional`
 > esbarra na proteção do PyPI por semelhança com outro projeto); o **import continua `pynfsenacional`**.
-> Pin recomendado: **`PyNFSeNacionalGT>=0.3.0`** — a v0.1.0 tem o bug de ordem da `<IM>` (corrigido na
-> 0.2.0) e a 0.3.0 traz o leiaute RTC 1.01.
+> Pin recomendado: **`PyNFSeNacionalGT>=0.5.0`** — a v0.1.0 tem o bug de ordem da `<IM>` (corrigido
+> na 0.2.0), a 0.3.0 traz o leiaute RTC 1.01, a 0.4.0 o MEI e o CNPJ alfanumérico, e a 0.5.0 a
+> Inscrição Municipal opcional de verdade (§10 do conhecimento fiscal).
 
 ---
 
@@ -139,6 +141,8 @@ Cada prestador é descrito por um **JSON puro**. Comece copiando o exemplo anota
   "prestador": {
     "cnpj": "00000000000000",           // ★ 14 dígitos
     "codigo_municipio": "0000000",      // ★ IBGE 7 díg do município do emitente
+    "inscricao_municipal": null,        //   OPCIONAL — quem decide é o CNC, POR CNPJ (E0116 ×
+                                        //   E0120). Sem IM no CNC: deixe null. Nunca "de enfeite"
     "regime": {                         // ★ regime tributário
       "opSimpNac": 3,                   //   1=Não Optante (roadmap) · 2=MEI · 3=Optante ME/EPP
       "regApTribSN": 1,
@@ -150,9 +154,14 @@ Cada prestador é descrito por um **JSON puro**. Comece copiando o exemplo anota
   "servico": {
     "codigo_municipio_prestacao": "0000000",  // ★ IBGE do local da prestação
     "cTribNac": "041601",               // ★ Código de Tributação NACIONAL (6 díg, LC116)
-    "cTribMun": "001",                  // ★ desdobro municipal (sem ele → E0312)
+    "cTribMun": "001",                  //   desdobro municipal — obrigatório onde o município
+                                        //   usa desdobro (senão E0312); município sem desdobro
+                                        //   REJEITA o campo (E0315): deixe "" e ele é omitido
     "descricao_padrao": "Serviço Prestado",
-    "tributos": { "pTotTribSN": "6.00" }// ★ se Simples: % efetiva do Simples Nacional
+    "tributos": {
+      "pTotTribSN": "6.00",             // ★ se Simples ME/EPP: % efetiva do Simples Nacional
+      "piscofins_cst": "08"             //   CST do PIS/COFINS: "08"=sem incidência (default),
+    }                                   //   "00"=nenhum. Confira no XML do próprio contribuinte
   }
 }
 ```
@@ -166,7 +175,8 @@ Cada prestador é descrito por um **JSON puro**. Comece copiando o exemplo anota
 | **Código do município (IBGE)** | município de atuação do prestador |
 | **Regime** (`opSimpNac`/`regApTribSN`) | contabilidade (é Simples? MEI ou ME/EPP?) |
 | **`cTribNac`** (6 díg) | item da LC116 da atividade (mesmo código do portal) |
-| **`cTribMun`** (desdobro) | o que o município administra p/ aquele `cTribNac` |
+| **`cTribMun`** (desdobro) | o que o município administra p/ aquele `cTribNac` (alguns não usam) |
+| **Inscrição Municipal** | **o CNC do município, por CNPJ** — não é "por cidade" ([§10](docs/conhecimento-fiscal.md)) |
 | **`pTotTribSN`** (% Simples) | alíquota efetiva do Simples (contabilidade) |
 
 > 🔒 **Nada sensível vai para o git.** O `.pfx`, as configs reais (`config/`) e os XML/PDF de notas são
@@ -216,6 +226,8 @@ config (JSON)  →  montar DPS (XML)  →  assinar (XMLDSIG)  →  gzip+base64 �
 - ✅ Publicado no PyPI (`PyNFSeNacionalGT`)
 - ✅ Tomador completo: `IM`, endereço, telefone e e-mail no `<toma>` (v0.2.0)
 - ✅ Leiaute **RTC 1.01** da DPS (NT 004 v2.0 / NT 007) — alinhado à revisão oficial do XSD (defensivo p/ o endurecimento das validações RTC)
+- ✅ **MEI** (`opSimpNac=2`) com DPS própria e **CNPJ alfanumérico** (NT 2025.001) — v0.4.0
+- ✅ **Inscrição Municipal opcional** (regra do CNC por CNPJ) e `cTribMun` omitido onde o município não usa — v0.5.0
 - ⏳ Endurecimento a partir de mais emissões reais
 - ⏳ Tomador estrangeiro / sem documento; não-optantes (Lucro Presumido/Real)
 - ⏳ Grupo **IBS/CBS** na DPS — obrigatório **só para Regime Regular** a partir de 03/08/2026 (o Simples é **dispensado** do destaque em 2026); **ainda não emitido**
@@ -243,6 +255,21 @@ Como contribuir: [`CONTRIBUTING.md`](CONTRIBUTING.md). Reportar vulnerabilidades
 
 ---
 
+## 🏛️ Origem
+
+Esta biblioteca nasceu dentro da **[GT Contabilidade](https://gtcontabilidade.com)** — escritório
+contábil que emite NFS-e pelo padrão nacional, mês após mês, para empresas espalhadas por municípios
+com regras diferentes entre si. Cada regra de [`docs/conhecimento-fiscal.md`](docs/conhecimento-fiscal.md)
+foi **paga com nota real**: emissão travada, mensagem críptica do SEFIN, distância entre o que a
+documentação diz e o que o município de fato aceita.
+
+Esse conhecimento é vantagem competitiva e poderia ter ficado guardado. A GT preferiu **publicá-lo
+sob licença MIT** — a obrigatoriedade do Sistema Nacional chega para todo mundo ao mesmo tempo, e
+ninguém deveria precisar pagar duas vezes pela mesma descoberta. O que está aqui é a **regra fiscal
+destilada** e o código que a implementa; **nunca** dado de contribuinte.
+
+---
+
 ## ⚖️ Aviso legal
 
 Biblioteca para emissão de NFS-e, em estágio **alpha**. **Use por sua conta e risco e valide cada
@@ -260,3 +287,6 @@ só emite não a instala.
 
 Construído sobre o trabalho da comunidade fiscal Python brasileira — **Akretion/erpbrasil**
 (`erpbrasil.assinatura`) e **Engenere** (`BrazilFiscalReport`).
+
+Mantido pela **[GT Contabilidade](https://gtcontabilidade.com)**, que bancou as emissões reais em
+que cada regra deste repositório foi descoberta e validada.
