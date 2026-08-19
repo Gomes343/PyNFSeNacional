@@ -68,13 +68,27 @@ def test_inscricao_municipal_vem_antes_do_regtrib():
     # Regressão: a IM (TSInscricaoMunicipal) é uma SEQUÊNCIA no XSD AnexoI e vem ANTES do
     # regTrib. Emiti-la depois gera E1235 (falha de schema) para todo prestador com IM. O
     # gabarito (CONFIG_VALIDA) não tem IM, então o byte-diff não pegava — pegou o diff contra
-    # o motor PHP de produção (clientes com inscrição municipal).
+    # a implementação de referência em PHP (prestadores com inscrição municipal).
     cfg = ClienteConfig.from_dict({**CONFIG_VALIDA,
                                    "prestador": {**CONFIG_VALIDA["prestador"],
-                                                 "inscricao_municipal": "02200392"}})
+                                                 "inscricao_municipal": "12345678"}})
     prest = _inf(_montar(cfg)).find(f"{{{NS}}}prest")
     assert [etree.QName(c).localname for c in prest] == ["CNPJ", "IM", "regTrib"]
-    assert prest.find(f"{{{NS}}}IM").text == "02200392"
+    assert prest.find(f"{{{NS}}}IM").text == "12345678"
+
+
+def test_prestador_sem_im_omite_o_elemento():
+    # A IM é OPCIONAL e quem manda é o CNC do município, POR CNPJ (§10): quando o CNPJ não tem
+    # IM no CNC, informá-la dá E0120 ("IM não deve ser informada..."). Config com IM vazia,
+    # nula ou ausente => o <IM> NÃO sai do XML. Regressão de produção: municípios sem CNC e
+    # CNPJs sem IM dentro de município COM CNC emitem limpo justamente por essa omissão.
+    for valor in (None, "", "   "):
+        cfg = ClienteConfig.from_dict({**CONFIG_VALIDA,
+                                       "prestador": {**CONFIG_VALIDA["prestador"],
+                                                     "inscricao_municipal": valor}})
+        prest = _inf(_montar(cfg)).find(f"{{{NS}}}prest")
+        assert prest.find(f"{{{NS}}}IM") is None, f"IM não deveria sair para {valor!r}"
+        assert [etree.QName(c).localname for c in prest] == ["CNPJ", "regTrib"]
 
 
 def test_tomador_identificado_tem_cpf_e_nome():
@@ -91,34 +105,34 @@ def test_sem_tomador_omite_bloco():
 def test_tomador_endereco_fone_email_ordem_do_xsd():
     # Campos opcionais do tomador (end/fone/email) na ORDEM do XSD (TSDestinaDps):
     # CPF|CNPJ → IM → xNome → end → fone → email. Fora de ordem = E1235.
-    tom = {
-        "cpf_cnpj": "45192564000101", "nome": "PREFEITURA MUNICIPAL DE SILVEIRAS",
+    tom = {                                          # dados FICTÍCIOS (CNPJ de teste, mód-11 ok)
+        "cpf_cnpj": "11222333000181", "nome": "EMPRESA TOMADORA EXEMPLO LTDA",
         "im": "12345",
-        "endereco": {"cep": "12690-000", "logradouro": "ANTONIO PEREIRA AZEVEDO",
-                     "numero": "52", "bairro": "CENTRO", "cMun": "3552007"},
-        "fone": "(12) 3106-1150", "email": "contato@silveiras.sp.gov.br",
+        "endereco": {"cep": "01000-000", "logradouro": "RUA EXEMPLO",
+                     "numero": "52", "bairro": "CENTRO", "cMun": "3550308"},
+        "fone": "(11) 5555-1234", "email": "contato@exemplo.com.br",
     }
     toma = _inf(_montar(ClienteConfig.from_dict(CONFIG_VALIDA), tomador=tom)).find(f"{{{NS}}}toma")
     assert [etree.QName(c).localname for c in toma] == \
         ["CNPJ", "IM", "xNome", "end", "fone", "email"]
-    assert toma.find(f"{{{NS}}}fone").text == "1231061150"        # só dígitos
-    assert toma.find(f"{{{NS}}}email").text == "contato@silveiras.sp.gov.br"
+    assert toma.find(f"{{{NS}}}fone").text == "1155551234"        # só dígitos
+    assert toma.find(f"{{{NS}}}email").text == "contato@exemplo.com.br"
     # <end> nacional, ordem interna: endNac(cMun, CEP) → xLgr → nro → xBairro (sem xCpl aqui)
     end = toma.find(f"{{{NS}}}end")
     assert [etree.QName(c).localname for c in end] == ["endNac", "xLgr", "nro", "xBairro"]
     endnac = end.find(f"{{{NS}}}endNac")
     assert [etree.QName(c).localname for c in endnac] == ["cMun", "CEP"]
-    assert endnac.find(f"{{{NS}}}cMun").text == "3552007"
-    assert endnac.find(f"{{{NS}}}CEP").text == "12690000"         # CEP sem traço, 8 díg
-    assert end.find(f"{{{NS}}}xLgr").text == "ANTONIO PEREIRA AZEVEDO"
+    assert endnac.find(f"{{{NS}}}cMun").text == "3550308"
+    assert endnac.find(f"{{{NS}}}CEP").text == "01000000"         # CEP sem traço, 8 díg
+    assert end.find(f"{{{NS}}}xLgr").text == "RUA EXEMPLO"
     assert end.find(f"{{{NS}}}nro").text == "52"
     assert end.find(f"{{{NS}}}xBairro").text == "CENTRO"
 
 
 def test_tomador_endereco_com_complemento():
-    tom = {"cpf_cnpj": "45192564000101", "nome": "X",
-           "endereco": {"cep": "12690000", "logradouro": "RUA A", "numero": "10",
-                        "complemento": "Sala 2", "bairro": "CENTRO", "cMun": "3552007"}}
+    tom = {"cpf_cnpj": "11222333000181", "nome": "X",
+           "endereco": {"cep": "01000000", "logradouro": "RUA A", "numero": "10",
+                        "complemento": "Sala 2", "bairro": "CENTRO", "cMun": "3550308"}}
     end = _inf(_montar(ClienteConfig.from_dict(CONFIG_VALIDA),
                        tomador=tom)).find(f"{{{NS}}}toma/{{{NS}}}end")
     assert [etree.QName(c).localname for c in end] == ["endNac", "xLgr", "nro", "xCpl", "xBairro"]
@@ -127,10 +141,10 @@ def test_tomador_endereco_com_complemento():
 
 def test_tomador_endereco_incompleto_e_omitido_atomico():
     # Bloco parcial (sem bairro) = E1235 → omite o endereço INTEIRO (tudo-ou-nada), mas a
-    # nota continua válida (CNPJ + xNome). Espelha o gt_montar_endereco do PHP.
-    tom = {"cpf_cnpj": "45192564000101", "nome": "X",
-           "endereco": {"cep": "12690000", "logradouro": "RUA A", "numero": "10",
-                        "cMun": "3552007"}}  # falta xBairro
+    # nota continua válida (CNPJ + xNome). Espelha a implementação de referência em PHP.
+    tom = {"cpf_cnpj": "11222333000181", "nome": "X",
+           "endereco": {"cep": "01000000", "logradouro": "RUA A", "numero": "10",
+                        "cMun": "3550308"}}  # falta xBairro
     toma = _inf(_montar(ClienteConfig.from_dict(CONFIG_VALIDA),
                         tomador=tom)).find(f"{{{NS}}}toma")
     assert toma.find(f"{{{NS}}}end") is None
@@ -176,7 +190,7 @@ def test_mei_usa_indtottrib_e_omite_regaptribsn():
     # MEI (opSimpNac=2) é ISENTO do valor aproximado dos tributos (Decreto 8.264/2014):
     # totTrib usa indTotTrib (NÃO pTotTribSN), e o regTrib NÃO leva regApTribSN — igual à nota
     # real do EmissorWeb do gov. O chaveamento é do MOTOR: mesmo com regApTribSN no config
-    # (default do RegimeConfig é 1), o MEI o omite. Regressão do 1º cliente MEI no motor API.
+    # (default do RegimeConfig é 1), o MEI o omite. Regressão do primeiro MEI em produção.
     cfg = ClienteConfig.from_dict({**CONFIG_VALIDA,
                                    "prestador": {**CONFIG_VALIDA["prestador"],
                                                  "regime": {"opSimpNac": 2, "regApTribSN": 1,
@@ -189,3 +203,31 @@ def test_mei_usa_indtottrib_e_omite_regaptribsn():
     assert [etree.QName(c).localname for c in trib] == ["tribMun", "totTrib"]
     tot = trib.find(f"{{{NS}}}totTrib")
     assert [etree.QName(c).localname for c in tot] == ["indTotTrib"]
+
+
+def test_piscofins_cst_default_e_override():
+    # CST do PIS/COFINS: o default do motor é "08" (Operação sem Incidência) e é aceito pelo
+    # SEFIN, mas há contribuintes cujo portal emite "00" (Nenhum) — a fonte da verdade é o XML
+    # que o próprio contribuinte já emitiu (§12). Portanto: precisa ser configurável.
+    inf = _inf(_montar(ClienteConfig.from_dict(CONFIG_VALIDA)))
+    assert _txt(inf, "valores/trib/tribFed/piscofins/CST") == "08"
+
+    cfg = ClienteConfig.from_dict({
+        **CONFIG_VALIDA,
+        "servico": {**CONFIG_VALIDA["servico"],
+                    "tributos": {**CONFIG_VALIDA["servico"]["tributos"], "piscofins_cst": "00"}},
+    })
+    assert _txt(_inf(_montar(cfg)), "valores/trib/tribFed/piscofins/CST") == "00"
+
+
+def test_endereco_incompleto_do_tomador_avisa_no_log(caplog):
+    # A omissão atômica do <end> não pode ser SILENCIOSA: sem aviso, a nota sai "com sucesso"
+    # sem o endereço que o chamador achou que tinha mandado. O log diz QUAIS campos faltaram —
+    # e não vaza valor nenhum (nada de CEP/logradouro do tomador no log).
+    tom = {"cpf_cnpj": "11222333000181", "nome": "X",
+           "endereco": {"cep": "01000000", "logradouro": "RUA EXEMPLO", "numero": "10",
+                        "cMun": "3550308"}}  # falta xBairro
+    with caplog.at_level("WARNING", logger="pynfsenacional.dps"):
+        _montar(ClienteConfig.from_dict(CONFIG_VALIDA), tomador=tom)
+    assert "bairro" in caplog.text and "OMITIDO" in caplog.text
+    assert "RUA EXEMPLO" not in caplog.text and "01000000" not in caplog.text

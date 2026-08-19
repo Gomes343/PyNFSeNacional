@@ -22,7 +22,7 @@ _RE_CNPJ = re.compile(r"^[A-Z0-9]{12}[0-9]{2}$")
 
 
 def digitos(s: str | None) -> str:
-    """Remove tudo que não for dígito (espelha `gt_digitos` do PHP).
+    """Remove tudo que não for dígito.
 
     Usar SÓ para campos genuinamente numéricos (CEP, código de município, telefone,
     inscrição municipal, CPF). Para CNPJ use `norm_documento` — senão as letras do

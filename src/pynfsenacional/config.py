@@ -73,6 +73,10 @@ class Prestador:
     regime: Regime
     uf: str | None = None
     inscricao_municipal: str | None = None
+    # A IM é OPCIONAL e quem decide se ela vai na DPS é o CNC (Cadastro Nacional de
+    # Contribuintes) do município — POR CNPJ, não por cidade (§10). Tem no CNC → mandar
+    # (senão E0116); não tem → deixar VAZIO/None (mandar dá E0120). Nunca preencher de
+    # enfeite ("0000"): ou é recusado, ou passa e vira nota real com dado falso.
     # Nome/endereço do prestador NÃO são enviados quando ele é o emitente (E0128/E0121).
 
 
@@ -85,6 +89,10 @@ class Servico:
     # REJEITAM o campo: Curitiba devolve E0315 ("não é permitido informar 000"). Nesses casos,
     # deixar VAZIO — o dps.py omite o elemento (as notas reais de Curitiba não têm cTribMun).
     descricao_padrao: str = "Serviço Prestado"
+    # tributos aceitos: "pTotTribSN" (% do Simples, ME/EPP) · "indTotTrib" (MEI/Não Optante)
+    # · "tribISSQN" · "tpRetISSQN" · "piscofins_cst" (CST do PIS/COFINS; default "08" =
+    # Operação sem Incidência. Alguns contribuintes emitem "00" = Nenhum — o critério é o XML
+    # que o próprio contribuinte já emitiu; ver §12).
     tributos: dict[str, Any] = field(default_factory=dict)  # ex.: {"pTotTribSN": "6.00"}
 
 
@@ -156,6 +164,16 @@ class ClienteConfig:
         if not (p.codigo_municipio.isdigit() and len(p.codigo_municipio) == 7):
             problemas.append(
                 f"código IBGE do município do prestador deve ter 7 dígitos: {p.codigo_municipio!r}"
+            )
+        # IM "de enfeite" (só zeros / sem dígito) é PIOR que omitir: ou o SEFIN recusa, ou passa
+        # e vira nota fiscal real com dado falso. Quem decide se a IM vai na DPS é o CNC do
+        # município, POR CNPJ (E0116 × E0120) — sem IM no CNC, deixar vazio/None (§10).
+        im = (p.inscricao_municipal or "").strip()
+        if im and not documentos.digitos(im).strip("0"):
+            problemas.append(
+                f"prestador.inscricao_municipal sem dígito significativo: {im!r}. A IM é "
+                f"OPCIONAL — se o CNC do município não tem IM para este CNPJ, deixe vazio/null "
+                f"(informar dá E0120); nunca preencha de enfeite"
             )
         if r.opSimpNac not in (1, 2, 3):
             problemas.append(

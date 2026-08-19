@@ -87,6 +87,21 @@ def test_ctribmun_vazio_e_permitido():
 
 
 # ── validar_tomador() — E1235 §7 ────────────────────────────────────────────
+def test_im_de_enfeite_e_recusada(config_dict):
+    # "Preencher a IM com zeros para satisfazer o campo" é o pior dos mundos: ou o SEFIN
+    # recusa, ou passa e vira nota fiscal REAL com dado falso. Quando o CNC do município não
+    # tem IM para aquele CNPJ, o certo é deixar VAZIO (§10).
+    for enfeite in ("0000", "000000", "0-0.0", "isento"):
+        config_dict["prestador"]["inscricao_municipal"] = enfeite
+        problemas = ClienteConfig.from_dict(config_dict).validar()
+        assert any("inscricao_municipal" in p for p in problemas), f"passou: {enfeite!r}"
+
+
+def test_im_valida_nao_reclama(config_dict):
+    config_dict["prestador"]["inscricao_municipal"] = "00012345"   # zeros à esquerda são ok
+    assert ClienteConfig.from_dict(config_dict).validar() == []
+
+
 def test_tomador_none_ou_sem_doc_ok():
     assert validar_tomador(None) == []
     assert validar_tomador({}) == []

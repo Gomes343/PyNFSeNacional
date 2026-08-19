@@ -21,12 +21,15 @@ byte-a-byte idêntica à de uma implementação de referência em PHP (privada; 
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from lxml import etree
 
 from . import documentos
 from .config import ClienteConfig
+
+_log = logging.getLogger(__name__)
 
 NS = "http://www.sped.fazenda.gov.br/nfse"
 VER_APLIC = "PyNFSeNacional-0.1"   # ≤ 20 chars (TSVerAplic / E1235)
@@ -69,8 +72,12 @@ def _montar_end_toma(toma: etree._Element, end: Any) -> None:
 
     BLOCO ATÔMICO (tudo-ou-nada): se faltar qualquer obrigatório (cMun 7 díg, CEP 8 díg,
     logradouro, bairro), OMITE o endereço inteiro — um bloco parcial é E1235. Mesma regra
-    do ``gt_montar_endereco``/``montarEnderecoTcEndereco`` do motor PHP de referência.
-    ``nro`` cai para 'S/N' quando vazio. Endereço no exterior (endExt) não é coberto aqui.
+    da implementação de referência em PHP. ``nro`` cai para 'S/N' quando vazio. Endereço no
+    exterior (``endExt``) não é coberto aqui.
+
+    A omissão é REGISTRADA em log (nível WARNING, só os NOMES dos campos que faltaram — nunca
+    o valor): descartar o endereço em silêncio faz a nota sair "com sucesso" sem o dado que o
+    chamador achou que tinha mandado.
     """
     if not isinstance(end, dict) or not end:
         return
@@ -79,8 +86,20 @@ def _montar_end_toma(toma: etree._Element, end: Any) -> None:
     xlgr = str(end.get("logradouro") or end.get("xLgr") or "").strip()
     bairro = str(end.get("bairro") or end.get("xBairro") or "").strip()
     nro = str(end.get("numero") or end.get("nro") or "").strip() or "S/N"
-    if len(cmun) != 7 or len(cep) != 8 or not xlgr or not bairro:
-        return  # parcial = E1235 → omite o endereço inteiro (atômico, igual ao PHP)
+    faltando = [
+        nome for nome, ok in (
+            ("cMun (7 díg)", len(cmun) == 7), ("CEP (8 díg)", len(cep) == 8),
+            ("logradouro", bool(xlgr)), ("bairro", bool(bairro)),
+        ) if not ok
+    ]
+    if faltando:
+        # Parcial = E1235 → omite o endereço INTEIRO (atômico). Avisa: guarda calada vira nota
+        # emitida "com sucesso" sem o endereço que o chamador achou que tinha mandado.
+        _log.warning(
+            "endereço do tomador OMITIDO da DPS: faltam %s (o bloco <end> é tudo-ou-nada)",
+            ", ".join(faltando),
+        )
+        return
     el_end = _el(toma, "end")
     endnac = _el(el_end, "endNac")
     _el(endnac, "cMun", cmun)
@@ -132,8 +151,12 @@ def montar_dps(
     # byte-a-byte contra a implementação PHP de referência (prestadores que têm IM).
     prest = _el(inf, "prest")
     _el(prest, "CNPJ", documentos.norm_documento(p.cnpj))  # CNPJ alfanumérico: preserva letras
-    if p.inscricao_municipal:
-        _el(prest, "IM", documentos.digitos(p.inscricao_municipal))
+    # A IM só entra se sobrar DÍGITO depois da limpeza: string vazia/em branco emitiria um
+    # <IM></IM> vazio (falha de schema), e a IM é opcional — quem decide se ela vai é o CNC
+    # do município, POR CNPJ (E0116 × E0120; ver docs §10).
+    im_prest = documentos.digitos(p.inscricao_municipal)
+    if im_prest:
+        _el(prest, "IM", im_prest)
     reg = _el(prest, "regTrib")
     _el(reg, "opSimpNac", str(r.opSimpNac))
     # regApTribSN (regime de apuração do SN) só se aplica a ME/EPP optante (opSimpNac=3).
