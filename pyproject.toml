@@ -24,7 +24,12 @@ classifiers = [
 # não reimplementar criptografia. Ver docs/roadmap.md (mapa peça → biblioteca).
 dependencies = [
     "lxml>=4.9",                    # montagem/serialização do XML da DPS + canonicalização C14N do infDPS
-    "erpbrasil.assinatura>=1.7",    # assinatura XMLDSIG do DPS (assina_xml2 por Id; a peça que era o "nó")
+    # assinatura XMLDSIG do DPS (assina_xml2 por Id; a peça que era o "nó").
+    # != 1.8.1: ela pôs teto signxml<4 + pyOpenSSL<24.3 (para o Odoo), o que força cryptography<44
+    # e lxml<6 — e no Python 3.14 o lxml 5.x não tem wheel: a instalação quebra. Para a DPS a
+    # Signature é filha do <DPS> (não do elemento assinado), então o signxml 5 é seguro aqui —
+    # tests/test_golden.py confere posição, namespace, DigestValue e verificação.
+    "erpbrasil.assinatura>=1.7,!=1.8.1",
     "cryptography>=42",             # leitura do certificado A1 .pfx (PKCS#12, cifras legadas ICP-Brasil)
     "requests>=2.31",               # transporte mTLS ao SEFIN (gzip + base64)
     "requests-pkcs12>=1.25",        # mTLS com o .pfx DIRETO (PKCS#12), como o cURL P12 do PHP

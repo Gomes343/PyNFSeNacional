@@ -17,6 +17,11 @@ versionamento [SemVer](https://semver.org/lang/pt-BR/).
   ~1 nota em 16 caía. Agora `dhEmi` nasce **recuado 5s** (`relogio.MARGEM_E0008_S`), com trava de
   meia-noite para nunca trocar a competência (`dCompet`). Um `dh_emi` explícito continua literal.
 
+- **Instalação quebrada no Python 3.14.** A `erpbrasil.assinatura` 1.8.1 (30/09/2026) pôs teto
+  `signxml<4` + `pyOpenSSL<24.3`, o que força `lxml<6` — sem wheel para o 3.14. A dependência
+  passa a ser `erpbrasil.assinatura>=1.7,!=1.8.1`. Para a DPS o `signxml` 5 é seguro (a
+  `Signature` é filha do `<DPS>`); o teste do golden confere posição, namespace e verificação.
+
 ### Adicionado
 - **Informações complementares** (`servico.info_complementares` → `serv/infoCompl/xInfComp`):
   texto livre impresso no DANFSe, sem efeito fiscal. Vazio omite o grupo; truncado em 2000.
