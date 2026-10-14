@@ -94,6 +94,11 @@ class Servico:
     # Operação sem Incidência. Alguns contribuintes emitem "00" = Nenhum — o critério é o XML
     # que o próprio contribuinte já emitiu; ver §12).
     tributos: dict[str, Any] = field(default_factory=dict)  # ex.: {"pTotTribSN": "6.00"}
+    # Texto livre do <infoCompl><xInfComp> (serv/infoCompl/xInfComp, 0-1, até 2000 chars).
+    # NÃO é obrigatório e NÃO tem efeito fiscal: é um recado impresso no DANFSe ("Inf. Cont.:").
+    # Uso típico: o prestador do Simples avisar o tomador PJ de que não há retenção de IRRF
+    # (IN RFB 765/2007, art. 1º). Vazio = elemento omitido.
+    info_complementares: str = ""
 
 
 @dataclass

@@ -158,6 +158,34 @@ def test_tomador_sem_extras_xml_inalterado():
     assert [etree.QName(c).localname for c in toma] == ["CPF", "xNome"]
 
 
+def test_info_complementares_vai_no_fim_do_serv():
+    # xInfComp (texto livre, sem efeito fiscal) — infoCompl é o ÚLTIMO filho de <serv> (TCServ).
+    cfg = ClienteConfig.from_dict(
+        {**CONFIG_VALIDA,
+         "servico": {**CONFIG_VALIDA["servico"],
+                     "info_complementares": "Nao ha retencao de IRRF"}}
+    )
+    inf = _inf(_montar(cfg))
+    serv = inf.find(f"{{{NS}}}serv")
+    assert [etree.QName(c).localname for c in serv] == ["locPrest", "cServ", "infoCompl"]
+    assert _txt(inf, "serv/infoCompl/xInfComp") == "Nao ha retencao de IRRF"
+
+
+def test_info_complementares_vazio_omite_o_grupo():
+    # Sem texto, nem <infoCompl> nem <xInfComp> (minLength=1): XML idêntico ao de antes.
+    inf = _inf(_montar(ClienteConfig.from_dict(CONFIG_VALIDA)))
+    serv = inf.find(f"{{{NS}}}serv")
+    assert [etree.QName(c).localname for c in serv] == ["locPrest", "cServ"]
+
+
+def test_info_complementares_trunca_em_2000():
+    cfg = ClienteConfig.from_dict(
+        {**CONFIG_VALIDA,
+         "servico": {**CONFIG_VALIDA["servico"], "info_complementares": "x" * 2500}}
+    )
+    assert len(_txt(_inf(_montar(cfg)), "serv/infoCompl/xInfComp")) == 2000
+
+
 def test_par_ctribnac_ctribmun():
     inf = _inf(_montar(ClienteConfig.from_dict(CONFIG_VALIDA)))
     assert _txt(inf, "serv/cServ/cTribNac") == "041601"

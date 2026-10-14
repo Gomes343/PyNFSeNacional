@@ -199,6 +199,13 @@ def montar_dps(
     if s.cTribMun:
         _el(cserv, "cTribMun", str(s.cTribMun))
     _el(cserv, "xDescServ", descricao or s.descricao_padrao)
+    # infoCompl (0-1) é o ÚLTIMO filho de <serv> no XSD (TCServ) — depois de locPrest/cServ e de
+    # comExt/obra/atvEvento/explRod, que não emitimos. Texto livre, sem efeito fiscal: o SEFIN não
+    # o interpreta e o DANFSe o imprime como "Inf. Cont.:". Vazio → o grupo inteiro é OMITIDO
+    # (um <infoCompl/> sem filho é falha de schema, e xInfComp tem minLength=1).
+    info_compl = (s.info_complementares or "").strip()
+    if info_compl:
+        _el(_el(serv, "infoCompl"), "xInfComp", info_compl[:2000])  # TSDescInfCompl: 1-2000
 
     # Valores e tributos.
     valores = _el(inf, "valores")
