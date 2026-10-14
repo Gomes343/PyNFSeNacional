@@ -24,8 +24,8 @@
 
 **Fora do v0.1 (próximas versões):**
 - IBS/CBS — o **leiaute** da DPS já está em **1.01** (RTC), mas o **grupo `IBSCBS` ainda não é
-  emitido**: é obrigatório só para **Regime Regular** a partir de 03/08/2026 (Simples dispensado em
-  2026). Ver §8 do conhecimento.
+  emitido**: obrigatório na NFS-e para o **Regime Regular** desde 01/10/2026 e para o **Simples
+  a partir de 01/01/2027** (Ato Conjunto RFB/CGIBS nº 4/2026). Ver §8 do conhecimento.
 - Tomador estrangeiro / sem documento (consumidor final é só "omitir `<toma>`", esse entra fácil).
 - Não-optantes (Lucro Presumido/Real) — usam `indTotTrib` em vez de `pTotTribSN`.
 - Eventos (cancelamento, substituição).

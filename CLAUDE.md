@@ -10,7 +10,7 @@
 Pacote Python público (MIT) que emite **NFS-e pela API SEFIN Nacional** (DPS) e gera o **DANFSe
 localmente**. Publicado no GitHub e no PyPI. Feito por um contador da **GT Contabilidade**
 (https://gtcontabilidade.com) — que emite NFS-e nacional em produção e abriu o conhecimento — para
-a comunidade que vai bater na obrigatoriedade nacional (~set/2026).
+a comunidade que emite pelo padrão nacional.
 
 ## Origem
 
@@ -57,7 +57,7 @@ ruff check .               # lint
 
 ## Estado atual
 
-**Alpha — pipeline completo.** Todas as peças estão implementadas; `Emissor.emitir()` roda
+**Lançado (1.x) — pipeline completo, em produção real.** Todas as peças estão implementadas; `Emissor.emitir()` roda
 ponta a ponta: **validar → montar DPS → assinar → transporte mTLS → Nota** (+ `nota.danfse()`).
 
 - `config.py` — dataclasses + `validar()` (E-codes) + loader tolerante. ✅
@@ -110,7 +110,7 @@ release por tag `vX.Y.Z` (PyPI via Trusted Publishing + Release do GitHub, sem t
 
 Tooling: `pip install -e ".[dev]"` (deps instalam no 3.10–3.14), lock com hashes
 (`requirements-dev.txt`), CI (`.github/workflows/ci.yml`), release por tag (`release.yml`).
-Testes: `pytest` (85 passed, +2 skip locais), `ruff check .`, `mypy --strict` — tudo verde.
+Testes: `pytest` (97 passed, +2 skip locais), `ruff check .`, `mypy --strict` — tudo verde.
 
 ## Regras
 

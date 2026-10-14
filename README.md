@@ -14,22 +14,23 @@ robô de navegador nem da API de PDF do governo.
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Ruff](https://img.shields.io/badge/lint-ruff-261230)](https://github.com/astral-sh/ruff)
 [![Checked: mypy](https://img.shields.io/badge/types-mypy%20strict-blue)](https://mypy-lang.org/)
-[![Status](https://img.shields.io/badge/status-alpha-orange)]()
+[![Status](https://img.shields.io/badge/status-lan%C3%A7ado-brightgreen)](CHANGELOG.md)
 
 </div>
 
-> ⚠️ **Status: alpha.** O pipeline está **completo e funciona ponta a ponta** — `config → certificado
-> → DPS → assinatura → transporte mTLS → DANFSe` — e já **emitiu em homologação e em produção real**
-> contra o SEFIN Nacional. A montagem da DPS é validada **byte a byte** contra uma implementação de
-> referência em PHP que já emite em produção. Ainda assim, é uma biblioteca de emissão de NFS-e em
-> estágio inicial: **valide cada emissão**.
+> ✅ **Lançado — v1.0.** Em **produção real desde junho de 2026**: é o motor que emite as NFS-e de um
+> escritório de contabilidade, mês após mês, para prestadores de vários municípios — **centenas de
+> notas autorizadas** pelo SEFIN Nacional. O pipeline completo (`config → certificado → DPS →
+> assinatura → transporte mTLS → DANFSe`) é validado **byte a byte** contra uma implementação de
+> referência e coberto por testes. A responsabilidade pela nota é sempre do emitente: **valide cada
+> emissão**.
 
 ---
 
 ## Por que existe
 
-Com a obrigatoriedade do **Sistema Nacional NFS-e** chegando para o Simples Nacional (~set/2026), todo
-escritório de contabilidade vai precisar emitir NFS-e pelo padrão nacional. O ecossistema **PHP** já
+Com o **Sistema Nacional NFS-e** virando o padrão do país — e a reforma tributária (IBS/CBS) passando
+por ele —, todo escritório de contabilidade precisa emitir NFS-e pelo padrão nacional. O ecossistema **PHP** já
 tem bibliotecas maduras para isso; o **Python**, não — falta uma solução turnkey, ponta a ponta. Este
 projeto preenche essa lacuna, **integrando** o que o ecossistema fiscal Python já tem de melhor e
 adicionando o que faltava (o transporte ao SEFIN nacional + o acabamento).
@@ -228,10 +229,13 @@ config (JSON)  →  montar DPS (XML)  →  assinar (XMLDSIG)  →  gzip+base64 �
 - ✅ Leiaute **RTC 1.01** da DPS (NT 004 v2.0 / NT 007) — alinhado à revisão oficial do XSD (defensivo p/ o endurecimento das validações RTC)
 - ✅ **MEI** (`opSimpNac=2`) com DPS própria e **CNPJ alfanumérico** (NT 2025.001) — v0.4.0
 - ✅ **Inscrição Municipal opcional** (regra do CNC por CNPJ) e `cTribMun` omitido onde o município não usa — v0.5.0
+- ✅ **Margem anti-E0008** no `dhEmi` e **informações complementares** (`xInfComp`) — v1.0.0
 - ⏳ Endurecimento a partir de mais emissões reais
 - ⏳ Tomador estrangeiro / sem documento; não-optantes (Lucro Presumido/Real)
-- ⏳ Grupo **IBS/CBS** na DPS — obrigatório **só para Regime Regular** a partir de 03/08/2026 (o Simples é **dispensado** do destaque em 2026); **ainda não emitido**
-- ⏳ Eventos (cancelamento)
+- ⏳ Grupo **IBS/CBS** na DPS — **próxima prioridade.** Obrigatório na NFS-e para o **Regime Regular**
+  desde 01/10/2026 (sem rejeição até 31/12/2026) e para o **Simples Nacional a partir de 01/01/2027**
+  (Ato Conjunto RFB/CGIBS nº 4/2026); **ainda não emitido**
+- ⏳ Eventos (cancelamento e substituição)
 - ⏳ DANFSe: exibir o **total aproximado de tributos** do Simples (`pTotTribSN`, Lei 12.741) — hoje sai como "—" (o `BrazilFiscalReport` não lê esse campo)
 
 Detalhes em [`docs/roadmap.md`](docs/roadmap.md) e [`CHANGELOG.md`](CHANGELOG.md).
@@ -272,8 +276,7 @@ destilada** e o código que a implementa; **nunca** dado de contribuinte.
 
 ## ⚖️ Aviso legal
 
-Biblioteca para emissão de NFS-e, em estágio **alpha**. **Use por sua conta e risco e valide cada
-emissão** — a responsabilidade pela nota é sempre do contribuinte/emitente. **Não é um produto
+Biblioteca para emissão de NFS-e. **Use por sua conta e risco e valide cada emissão** — a responsabilidade pela nota é sempre do contribuinte/emitente. **Não é um produto
 fiscal homologado/certificado e não substitui orientação contábil.** Sem garantia de qualquer tipo
 (ver [LICENSE](LICENSE)).
 

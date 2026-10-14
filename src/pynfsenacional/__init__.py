@@ -6,7 +6,7 @@ API pública:
     nota = emissor.emitir(valor=150.00, descricao="...", tomador={...})
     nota.danfse("nota.pdf")
 
-Estado: alpha (pipeline completo). Ver docs/roadmap.md para o escopo e
+Estado: lançado (1.x), em produção real. Ver docs/roadmap.md para o escopo e
 docs/conhecimento-fiscal.md para a regra fiscal (DPS, E-codes, numeração, DANFSe).
 """
 

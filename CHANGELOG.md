@@ -3,6 +3,35 @@
 Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/);
 versionamento [SemVer](https://semver.org/lang/pt-BR/).
 
+## [1.0.0] - 2026-10-14
+
+> **Lançamento.** A biblioteca é o motor de produção de um escritório de contabilidade desde junho
+> de 2026, com centenas de NFS-e autorizadas pelo SEFIN Nacional. Sai do *alpha*: a partir daqui a
+> API pública (`Emissor`, `Nota`, `ClienteConfig` e o schema do config) segue **SemVer** — mudança
+> incompatível só numa `2.0`.
+
+### Corrigido
+- **E0008 intermitente** ("data de emissão posterior ao processamento"). Além do fuso (a causa
+  conhecida), havia uma segunda: `dhEmi` era o *piso* do segundo corrente, e a folga contra o
+  relógio do SEFIN — cujo pool corre de ~0 a ~1s atrás — era sorteada a cada nota. Em produção,
+  ~1 nota em 16 caía. Agora `dhEmi` nasce **recuado 5s** (`relogio.MARGEM_E0008_S`), com trava de
+  meia-noite para nunca trocar a competência (`dCompet`). Um `dh_emi` explícito continua literal.
+
+### Adicionado
+- **Informações complementares** (`servico.info_complementares` → `serv/infoCompl/xInfComp`):
+  texto livre impresso no DANFSe, sem efeito fiscal. Vazio omite o grupo; truncado em 2000.
+
+### Documentação
+- **Calendário do IBS/CBS na NFS-e corrigido** (Ato Conjunto RFB/CGIBS nº 4/2026): obrigatório
+  para o Regime Regular desde 01/10/2026 e para o **Simples Nacional a partir de 01/01/2027**; o
+  SEFIN autoriza sem o grupo até 31/12/2026, mas a nota fica em desconformidade. A data de
+  03/08/2026, citada antes, vale para NF-e/NFC-e. O grupo IBS/CBS é a **próxima prioridade**.
+- Status "alpha" removido do README, do classifier (`5 - Production/Stable`) e da política de
+  segurança (suporte à série `1.x`).
+
+### Interno
+- `nfelib` (e `xsdata`) saíram do lock de desenvolvimento — nunca foram importadas.
+
 ## [0.5.0] - 2026-08-19
 
 > Release do **conhecimento de produção**: o que meses emitindo nota real ensinaram sobre

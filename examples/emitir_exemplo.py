@@ -1,7 +1,7 @@
 """Quickstart — a API pública deste pacote.
 
-O pipeline está implementado (alpha): este script emite de fato, desde que você aponte
-para um config real de cliente (`config/cliente.json`, fora do git) com um certificado A1.
+Este script emite de fato, desde que você aponte para um config real de cliente
+(`config/cliente.json`, fora do git) com um certificado A1.
 Em `homologacao` a nota é de teste, sem validade jurídica. Valide cada emissão.
 
 Rodar:  python examples/emitir_exemplo.py

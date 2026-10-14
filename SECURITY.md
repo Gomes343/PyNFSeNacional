@@ -5,8 +5,8 @@ segurança a sério.
 
 ## Versões suportadas
 
-O projeto está em **alpha** (`0.1.x`). Correções de segurança vão para a última versão da série
-`0.1.x`. Não há suporte retroativo a versões anteriores durante o alpha.
+Correções de segurança vão para a **última versão publicada da série `1.x`** no PyPI. Versões `0.x`
+(pré-lançamento) não recebem correção — atualize para a `1.x`.
 
 ## Reportar uma vulnerabilidade
 

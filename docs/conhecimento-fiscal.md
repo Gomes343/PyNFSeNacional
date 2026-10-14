@@ -247,16 +247,28 @@ contribuinte é operação de município — o prestador recebe 404). Consequên
 
 ---
 
-## 8. IBS/CBS (reforma tributária) — planejado
+## 8. IBS/CBS (reforma tributária) — próxima prioridade
 
 O **leiaute** da DPS já está em **1.01** (RTC — NT 004 v2.0 / NT 007); ver `VERSAO_DPS` em `dps.py`.
 O grupo `IBSCBS` é **opcional no schema** (`minOccurs=0`) e o montador **ainda não o emite**.
 
-**Cronograma:** a partir de **03/08/2026** o grupo IBS/CBS + validações passam a ser **obrigatórios**
-na NFS-e Nacional (rejeição da DPS) — **porém só para Regime Regular** (Lucro Presumido/Real). O
-**Simples Nacional é dispensado** do destaque em 2026: os campos do destaque do Simples só entram na
-**NT 009** (sem data de produção), e o destaque do Simples só vale a partir de **2027**. Por isso,
-para os perfis atualmente suportados (Simples), emite-se **sem** o grupo.
+**Cronograma** (Ato Conjunto RFB/CGIBS nº 4, de 30/07/2026 — contado pelo **fato gerador**, que na
+NFS-e é o `dCompet`, não o dia da emissão):
+
+| Quem | Grupo IBS/CBS na NFS-e |
+|---|---|
+| **Regime Regular** (Lucro Presumido/Real), serviços da lista da LC 116 em geral | obrigatório desde **01/10/2026** |
+| Regime Regular — software/dados/streaming (1.03, 1.05, 1.09), transporte municipal (16.01), plataformas digitais, condomínio, locação e serviços fora da LC 116 | obrigatório desde **01/12/2026** |
+| **Simples Nacional** (qualquer serviço) | obrigatório a partir de **01/01/2027** (Ato Conjunto nº 4, art. 1º, § 1º) |
+
+⚠️ **Obrigatório não é o mesmo que rejeitado:** até 31/12/2026 o SEFIN **autoriza** a DPS sem o
+grupo (medido em 01/10/2026: nota de um optante do Simples, competência 01/10/2026, autorizada sem o
+grupo). A nota passa e fica em **desconformidade** — teste que passa não prova conformidade. Para o
+Regime Regular isso custa dinheiro: a dispensa do recolhimento de 2026 é condicionada à obrigação
+acessória (art. 348, § 1º). A data de 03/08/2026, citada em versões antigas deste
+documento, vale para **NF-e/NFC-e**, não para a NFS-e.
+
+Para os perfis atualmente suportados (Simples), emite-se **sem** o grupo **até 31/12/2026**.
 
 Quando entrar em escopo (um prestador de Regime Regular, ou mudança do SEFIN), acrescentar o grupo
 (CST/cClassTrib, alíquotas IBS UF/Mun e CBS, `indZFMALC`) ao montador da DPS.
