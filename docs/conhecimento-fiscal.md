@@ -156,7 +156,8 @@ A regra de cada erro é **fiscal**, vale para qualquer linguagem. A "Solução" 
 
 | Código | Sintoma | Causa | Solução |
 |---|---|---|---|
-| **E0008** | data de emissão "posterior ao processamento" | máquina em UTC × SEFIN em Brasília | fixar fuso **America/Sao_Paulo** antes de gerar `dhEmi` |
+| **E0008** *(causa 1)* | data de emissão "posterior ao processamento", em **toda** nota | máquina em UTC × SEFIN em Brasília (erro de 3h) | fixar fuso **America/Sao_Paulo** antes de gerar `dhEmi` |
+| **E0008** *(causa 2)* | idem, mas **intermitente** — a mesma nota passa no reenvio | **margem zero**: `dhEmi` era o PISO do segundo (`date('c')` / `.replace(microsecond=0)`), e o pool do SEFIN corre de ~0 a ~1s ATRÁS do nosso. Provado em 30/08/2026 (48 notas de um prestador numa noite): `dhProc` caiu no MESMO segundo do `dhEmi` em 12 de 16 notas; 1 delas estourou | recuar `dhEmi` de **`MARGEM_E0008_S` (5s)**, com trava de meia-noite p/ não trocar a competência — `relogio.recuar()` |
 | **E0312** | "código não administrado pelo município" | mandava só `cTribNac` | enviar **`cTribNac` + `cTribMun`** (o município administra a COMBINAÇÃO) |
 | **E0128** | "endereço do prestador não deve ser informado" | prestador=emitente (`tpEmit=1`) | **omitir** o endereço do prestador (SEFIN puxa do cadastro) |
 | **E0121** | "nome/razão do prestador não deve ser informado" | idem | **omitir** o nome — bloco do prestador = só CNPJ + regime |
