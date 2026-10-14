@@ -9,7 +9,7 @@ desenvolvedores que precisam emitir nota fiscal de serviço no **padrão naciona
 robô de navegador nem da API de PDF do governo.
 
 [![CI](https://github.com/Gomes343/PyNFSeNacional/actions/workflows/ci.yml/badge.svg)](https://github.com/Gomes343/PyNFSeNacional/actions/workflows/ci.yml)
-[![PyPI](https://img.shields.io/pypi/v/PyNFSeNacionalGT?color=blue)](https://pypi.org/project/PyNFSeNacionalGT/)
+[![PyPI](https://img.shields.io/pypi/v/PyNFSeNacionalGT?color=blue&cacheSeconds=3600)](https://pypi.org/project/PyNFSeNacionalGT/)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Ruff](https://img.shields.io/badge/lint-ruff-261230)](https://github.com/astral-sh/ruff)
