@@ -3,6 +3,29 @@
 Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/);
 versionamento [SemVer](https://semver.org/lang/pt-BR/).
 
+## [Não publicado]
+
+### Adicionado
+- **Regime Regular (Não Optante — Lucro Presumido/Real)**, conferido contra a DPS que o próprio
+  portal do governo monta e o SEFIN autoriza (§14): `servico.cNBS` (Item da NBS),
+  `tributos.tpRetPisCofins` (domínio 0–9 da NT 007), `tributos.pTotTrib` (percentual aproximado
+  federal/estadual/municipal, Lei 12.741) e o **grupo `IBSCBS`** (`servico.ibscbs`: `cIndOp`,
+  `CST`, `cClassTrib`, `indFinal`, `finNFSe`/`indDest` = 0) — só a classificação; os valores o
+  SEFIN calcula (§8).
+- **ISS retido pelo tomador** (`tributos.tpRetISSQN=2`): `validar_retencao()` recusa antes do envio
+  o tomador sem documento (**E0204**) ou sem endereço nacional completo (**E0237**); o `validar()`
+  recusa a retenção de MEI (E0583), regime especial (E0588), serviço imune/exportado (E0580) e do
+  ME/EPP que exigiria `pAliq` (E0621, ainda não emitido) — §15.
+- `validar()` passa a acusar CST de PIS/COFINS tributável sem `tpRetPisCofins` (**E0698**).
+
+### Corrigido
+- **`regApTribSN` na DPS do Não Optante (E0162).** O campo saía para todo regime que não fosse MEI,
+  e o default `1` da dataclass vazava para o `opSimpNac=1`. Agora é exclusivo do ME/EPP.
+
+### Inalterado
+- Sem os campos novos, a DPS do **Simples e do MEI sai byte-a-byte igual** (hashes do C14N pinados
+  em `tests/test_regime_regular.py`, tirados do código anterior) e o golden segue bate-byte.
+
 ## [1.0.0] - 2026-10-14
 
 > **Lançamento.** A biblioteca é o motor de produção de um escritório de contabilidade desde junho

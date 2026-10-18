@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from . import assinatura, dps, sefin
-from .config import ClienteConfig, ConfigError, validar_tomador
+from .config import ClienteConfig, ConfigError, validar_retencao, validar_tomador
 
 # A lib só EMITE logs; quem configura handler/nível é a aplicação (a CLI faz no --verbose).
 # Nunca logamos a senha do .pfx nem o XML com dados do tomador — só Id, ambiente, E-code, nNFSe.
@@ -65,7 +65,8 @@ class Emissor:
         Antes de montar a DPS, valida config + tomador (E-codes determinísticos) e
         levanta `ConfigError` — não adianta assinar/enviar uma DPS que o SEFIN vai rejeitar.
         """
-        problemas = self.cfg.validar() + validar_tomador(tomador)
+        problemas = (self.cfg.validar() + validar_tomador(tomador)
+                     + validar_retencao(self.cfg, tomador))   # E0204/E0237 (§15)
         if self.ambiente not in ("homologacao", "producao"):
             problemas.append(
                 f"ambiente inválido: {self.ambiente!r} (use 'homologacao' ou 'producao')"

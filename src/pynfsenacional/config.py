@@ -15,12 +15,33 @@ from __future__ import annotations
 import dataclasses
 import json
 from dataclasses import dataclass, field
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
 
 from . import documentos
 
 _AMBIENTES = ("homologacao", "producao")
+
+# totTrib/pTotTrib (§14): as três parcelas do percentual aproximado, na ordem do XSD, e o E-code
+# de cada uma quando sai do intervalo 0–100%.
+PTOTTRIB_CHAVES = ("pTotTribFed", "pTotTribEst", "pTotTribMun")
+_PTOTTRIB_ECODE = {"pTotTribFed": "E0706", "pTotTribEst": "E0707", "pTotTribMun": "E0708"}
+# servico.ibscbs (§8/§14): o que este montador sabe emitir. Chave fora daqui é recusada pelo
+# validar() — emitir o grupo sem o que a config pediu seria nota em desconformidade, calada.
+IBSCBS_CHAVES = ("finNFSe", "indFinal", "cIndOp", "indDest", "CST", "cClassTrib")
+# CST do PIS/COFINS que dispensam o tipo de retenção (E0698): Nenhum, sem incidência, suspensão.
+_CST_SEM_TPRET = ("00", "08", "09")
+
+
+def percentual(valor: Any) -> Decimal | None:
+    """'11.33' / '11,33' / 3 / 0 → Decimal; vazio ou não numérico → None."""
+    if valor is None or isinstance(valor, bool):
+        return None
+    try:
+        return Decimal(str(valor).strip().replace(",", "."))
+    except InvalidOperation:
+        return None
 
 
 class ConfigError(ValueError):
@@ -99,6 +120,14 @@ class Servico:
     # Uso típico: o prestador do Simples avisar o tomador PJ de que não há retenção de IRRF
     # (IN RFB 765/2007, art. 1º). Vazio = elemento omitido.
     info_complementares: str = ""
+    # Item da NBS (serv/cServ/cNBS, 9 dígitos), depois do xDescServ. Opcional no XSD que o SEFIN
+    # aplica; o portal o exige do Regime Regular e ele classifica o serviço para o IBS/CBS (§14).
+    # Vazio = elemento omitido (a DPS do Simples sai como sempre saiu).
+    cNBS: str = ""
+    # Grupo IBSCBS da DPS (§8/§14) — só a CLASSIFICAÇÃO; os valores o SEFIN calcula. Chaves:
+    # cIndOp, CST, cClassTrib (obrigatórias no bloco), indFinal (opcional), finNFSe e indDest
+    # (só "0"). Vazio = grupo omitido — o Simples dispensa o grupo até 31/12/2026.
+    ibscbs: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -220,11 +249,130 @@ class ClienteConfig:
                 except ValueError:
                     problemas.append(f"servico.tributos.pTotTribSN não é numérico: {ptot!r}")
 
+        problemas += self._validar_regime_regular()
+
         # Ambiente
         if self.ambiente not in _AMBIENTES:
             problemas.append(
                 f"ambiente inválido: {self.ambiente!r} (use 'homologacao' ou 'producao')"
             )
+        return problemas
+
+    def _validar_regime_regular(self) -> list[str]:
+        """O que entrou com o Regime Regular e a retenção (§12, §14, §15): Item da NBS, tipo de
+        retenção do ISSQN e do PIS/COFINS, pTotTrib e o grupo IBS/CBS. Tudo opcional — config
+        sem nenhum desses campos não ganha problema novo (Simples e MEI ficam como estavam)."""
+        problemas: list[str] = []
+        s, r, t = self.servico, self.prestador.regime, self.servico.tributos
+
+        nbs = (s.cNBS or "").strip()
+        if nbs and len(documentos.digitos(nbs)) != 9:
+            problemas.append(
+                f"servico.cNBS deve ter 9 dígitos (Item da NBS, TSCodNBS); recebido {nbs!r}"
+            )
+
+        # Retenção do ISSQN (§15). 3 = pelo intermediário, que exige o grupo <interm>.
+        ret = str(t.get("tpRetISSQN", 1)).strip()
+        if ret not in ("1", "2", "3"):
+            problemas.append(
+                f"servico.tributos.tpRetISSQN deve ser 1 (não retido), 2 (retido pelo tomador) "
+                f"ou 3 (retido pelo intermediário); recebido {t.get('tpRetISSQN')!r}"
+            )
+        elif ret == "3":
+            problemas.append(
+                "tpRetISSQN=3 (retido pelo intermediário) exige o grupo do intermediário "
+                "(<interm>), que esta biblioteca ainda não emite"
+            )
+        elif ret == "2":
+            if r.opSimpNac == 2:
+                problemas.append("E0583: MEI não sofre retenção do ISSQN — use tpRetISSQN=1")
+            if r.regEspTrib != 0:
+                problemas.append(
+                    "E0588: prestador com regime especial de tributação (regEspTrib≠0) não "
+                    "sofre retenção do ISSQN — use tpRetISSQN=1"
+                )
+            if str(t.get("tribISSQN", 1)).strip() in ("2", "3", "4"):
+                problemas.append(
+                    "E0580: serviço imune, exportado ou sem incidência (tribISSQN 2/3/4) não "
+                    "tem retenção do ISSQN — use tpRetISSQN=1"
+                )
+            if r.opSimpNac == 3 and r.regApTribSN == 1:
+                problemas.append(
+                    "E0621: ME/EPP com o ISS pelo Simples e ISS RETIDO exige a alíquota (pAliq) "
+                    "na DPS, que esta biblioteca ainda não emite (§15)"
+                )
+
+        # tribFed/piscofins (§12) — o MEI não emite tribFed (E0676), então não se aplica.
+        if r.opSimpNac != 2:
+            tprp = t.get("tpRetPisCofins")
+            if tprp is not None and not (str(tprp).strip().isdigit()
+                                         and len(str(tprp).strip()) == 1):
+                problemas.append(
+                    f"servico.tributos.tpRetPisCofins deve ser um dígito de 0 a 9 (NT 007); "
+                    f"recebido {tprp!r}"
+                )
+            cst = str(t.get("piscofins_cst", "08")).strip()
+            if cst not in _CST_SEM_TPRET and tprp is None:
+                problemas.append(
+                    f"E0698: CST do PIS/COFINS {cst!r} (diferente de 00, 08 e 09) exige "
+                    f"servico.tributos.tpRetPisCofins"
+                )
+
+        # totTrib/pTotTrib (§14) — o percentual aproximado em três parcelas, só Não Optante.
+        ptt = t.get("pTotTrib")
+        if ptt is not None:
+            if r.opSimpNac != 1:
+                problemas.append(
+                    "servico.tributos.pTotTrib é para o Não Optante (opSimpNac=1): o ME/EPP usa "
+                    "pTotTribSN e o MEI é isento (Decreto 8.264/2014) — §3/§14"
+                )
+            elif not isinstance(ptt, dict) or set(ptt) != set(PTOTTRIB_CHAVES):
+                recebidas = sorted(ptt) if isinstance(ptt, dict) else type(ptt).__name__
+                problemas.append(
+                    f"servico.tributos.pTotTrib deve ter exatamente {', '.join(PTOTTRIB_CHAVES)}; "
+                    f"recebido {recebidas}"
+                )
+            else:
+                for k in PTOTTRIB_CHAVES:
+                    v = percentual(ptt[k])
+                    if v is None or not (0 <= v <= 100):
+                        problemas.append(
+                            f"{_PTOTTRIB_ECODE[k]}: pTotTrib.{k} deve ser um percentual de 0 a "
+                            f"100; recebido {ptt[k]!r}"
+                        )
+
+        # Grupo IBS/CBS (§8/§14).
+        ibs = s.ibscbs
+        if not isinstance(ibs, dict):
+            problemas.append(f"servico.ibscbs deve ser um objeto; recebido {type(ibs).__name__}")
+        elif ibs:
+            desconhecidas = sorted(set(ibs) - set(IBSCBS_CHAVES))
+            if desconhecidas:
+                problemas.append(
+                    f"servico.ibscbs: {desconhecidas} não é coberto por esta biblioteca "
+                    f"(cobertos: {', '.join(IBSCBS_CHAVES)}) — §8"
+                )
+            for k, n in (("cIndOp", 6), ("CST", 3), ("cClassTrib", 6)):
+                cod = str(ibs.get(k) or "").strip()
+                if not (cod.isdigit() and len(cod) == n):
+                    problemas.append(
+                        f"servico.ibscbs.{k} é obrigatório no grupo IBS/CBS, com {n} dígitos; "
+                        f"recebido {ibs.get(k)!r}"
+                    )
+            if str(ibs.get("finNFSe", "0")).strip() != "0":
+                problemas.append(
+                    f"servico.ibscbs.finNFSe: o leiaute só tem 0 (NFS-e regular); "
+                    f"recebido {ibs.get('finNFSe')!r}"
+                )
+            if "indFinal" in ibs and str(ibs["indFinal"]).strip() not in ("0", "1"):
+                problemas.append(
+                    f"servico.ibscbs.indFinal deve ser 0 ou 1; recebido {ibs['indFinal']!r}"
+                )
+            if str(ibs.get("indDest", "0")).strip() != "0":
+                problemas.append(
+                    "servico.ibscbs.indDest=1 (destinatário diferente do adquirente) exige o "
+                    "grupo <dest>, que esta biblioteca ainda não emite — §8"
+                )
         return problemas
 
 
@@ -259,3 +407,24 @@ def validar_tomador(tomador: dict[str, Any] | None) -> list[str]:
             f"documento do tomador deve ser CPF (11) ou CNPJ (14 dígitos); recebido {doc!r}"
         )
     return problemas
+
+
+def validar_retencao(cfg: ClienteConfig, tomador: dict[str, Any] | None) -> list[str]:
+    """ISS retido pelo tomador (`tributos.tpRetISSQN=2`) × o tomador DESTA nota (§15).
+
+    A retenção transforma dois opcionais em obrigatórios: o tomador identificado (**E0204**) e o
+    endereço nacional dele **completo** (**E0237**). O `<end>` é bloco atômico (§7) — incompleto,
+    o montador o omite e a nota seria rejeitada; aqui a recusa sai antes, dizendo QUAIS campos
+    faltam (nunca os valores). Sem retenção, nada é exigido."""
+    if str(cfg.servico.tributos.get("tpRetISSQN", 1)).strip() != "2":
+        return []
+    tom = tomador or {}
+    doc = documentos.norm_documento(tom.get("cpf_cnpj") or tom.get("cpf") or tom.get("cnpj"))
+    if not doc:
+        return ["E0204: ISS retido pelo tomador (tpRetISSQN=2) exige o tomador identificado "
+                "por CPF/CNPJ"]
+    _, faltando = documentos.endereco_nacional(tom.get("endereco") or tom.get("end"))
+    if faltando:
+        return [f"E0237: ISS retido pelo tomador (tpRetISSQN=2) exige o endereço nacional "
+                f"completo do tomador — falta(m): {', '.join(faltando)}"]
+    return []

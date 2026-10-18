@@ -89,6 +89,12 @@ ponta a ponta: **validar → montar DPS → assinar → transporte mTLS → Nota
     e o `validar()` **recusa** IM sem dígito significativo (IM de enfeite vira nota real com dado
     falso). A omissão atômica do endereço do tomador passou a **logar WARNING** com os nomes dos
     campos que faltaram (nunca os valores). Regra completa em `docs/conhecimento-fiscal.md` §10–§13.
+  - **Regime Regular + ISS retido (18/10/2026, não publicado):** `cNBS`, `tpRetPisCofins`,
+    `pTotTrib`, grupo `IBSCBS` (classificação) e `tpRetISSQN=2` com `validar_retencao` (E0204/E0237),
+    todos opcionais por config; `regApTribSN` virou exclusivo do ME/EPP (E0162). Alvo: a DPS que o
+    PORTAL monta para um prestador do Lucro Presumido e o SEFIN autorizou — `tests/test_regime_regular.py`
+    bate o C14N com ela e pina os hashes do Simples/MEI de antes. Regra em `docs/conhecimento-fiscal.md`
+    §8, §12, §14 e §15.
 - `assinatura.py` — `assinar_dps` via `erpbrasil.assinatura`; mesmo `DigestValue` do gabarito. ✅
 - `sefin.py` — transporte mTLS (`requests-pkcs12`, P12 direto), `POST /nfse`, `verificarDps`.
   **mTLS validado ao vivo** em homologação (handshake + `HEAD /dps`, read-only). ✅
@@ -105,12 +111,13 @@ pyproject deles parece engano) só entra para gerar o PDF. Import lazy em `danfs
 
 **Publicado:** repo em github.com/Gomes343/PyNFSeNacional e pacote no PyPI (`PyNFSeNacionalGT`) —
 release por tag `vX.Y.Z` (PyPI via Trusted Publishing + Release do GitHub, sem token no repo).
-**Em aberto:** (1) endurecimento a partir de mais emissões reais; (2) grupo IBS/CBS na DPS;
-(3) reportar o classifier de licença errado upstream.
+**Em aberto:** (1) endurecimento a partir de mais emissões reais; (2) grupo IBS/CBS do **Simples**
+(01/01/2027) e os casos não cobertos do grupo; `pAliq`; (3) reportar o classifier de licença errado
+upstream.
 
 Tooling: `pip install -e ".[dev]"` (deps instalam no 3.10–3.14), lock com hashes
 (`requirements-dev.txt`), CI (`.github/workflows/ci.yml`), release por tag (`release.yml`).
-Testes: `pytest` (97 passed, +2 skip locais), `ruff check .`, `mypy --strict` — tudo verde.
+Testes: `pytest` (138 passed, +2 skip locais), `ruff check .`, `mypy --strict` — tudo verde.
 
 ## Regras
 

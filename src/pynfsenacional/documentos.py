@@ -14,6 +14,7 @@ base "12ABC34501DE" → DV "35".
 from __future__ import annotations
 
 import re
+from typing import Any
 
 _NAO_DIGITO = re.compile(r"\D")
 _NAO_ALNUM = re.compile(r"[^A-Z0-9]")
@@ -76,3 +77,33 @@ def cnpj_valido(valor: str | None) -> bool:
     dv1 = _mod11_dv(cnpj[:12], [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2])
     dv2 = _mod11_dv(cnpj[:13], [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2])
     return cnpj[12] == str(dv1) and cnpj[13] == str(dv2)
+
+
+# Endereço NACIONAL (TCEndereco/endNac): os obrigatórios do bloco e o nome com que cada um é
+# reportado quando falta. Fonte única da regra "bloco atômico" (§7) — o montador a usa para
+# OMITIR o <end> incompleto, e o validador da retenção (§15) para RECUSAR a nota que exige o
+# endereço (E0237). Duas cópias da mesma regra divergiriam em silêncio.
+def endereco_nacional(end: Any) -> tuple[dict[str, str], list[str]]:
+    """Normaliza o endereço nacional e diz o que falta. → (campos, faltando).
+
+    `campos`: cMun (7 díg), CEP (8 díg), xLgr, nro ('S/N' quando vazio), xCpl ('' se ausente) e
+    xBairro. `faltando`: os NOMES dos obrigatórios ausentes ou malformados — nunca os valores.
+    Endereço ausente/vazio → `faltando == ["endereço"]`.
+    """
+    if not isinstance(end, dict) or not end:
+        return {}, ["endereço"]
+    campos = {
+        "cMun": digitos(end.get("cMun") or end.get("codigo_municipio") or end.get("ibge")),
+        "CEP": digitos(end.get("cep") or end.get("CEP")),
+        "xLgr": str(end.get("logradouro") or end.get("xLgr") or "").strip(),
+        "nro": str(end.get("numero") or end.get("nro") or "").strip() or "S/N",
+        "xCpl": str(end.get("complemento") or end.get("xCpl") or "").strip(),
+        "xBairro": str(end.get("bairro") or end.get("xBairro") or "").strip(),
+    }
+    faltando = [
+        nome for nome, ok in (
+            ("cMun (7 díg)", len(campos["cMun"]) == 7), ("CEP (8 díg)", len(campos["CEP"]) == 8),
+            ("logradouro", bool(campos["xLgr"])), ("bairro", bool(campos["xBairro"])),
+        ) if not ok
+    ]
+    return campos, faltando

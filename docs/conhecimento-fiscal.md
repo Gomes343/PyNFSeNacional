@@ -143,7 +143,11 @@ O MEI é optante do Simples, mas **não** segue a mesma DPS do ME/EPP (`opSimpNa
 - **Por que `indTotTrib` e não `pTotTribSN`:** o E0712 proíbe `indTotTrib` para **ME/EPP**, mas o MEI
   é justamente o caso de **não informar** (Decreto 8.264/2014). Usar `pTotTribSN` num MEI destoa da
   nota real e informa um percentual que não se aplica.
-- **Não Optante (`opSimpNac=1`)** também usa `indTotTrib`; só o **ME/EPP (3)** usa `pTotTribSN`.
+- **Não Optante (`opSimpNac=1`)** usa `indTotTrib` — ou, quando configurado, o **`pTotTrib`**
+  (percentuais federal/estadual/municipal, §14); só o **ME/EPP (3)** usa `pTotTribSN`.
+- **`regApTribSN` é exclusivo do ME/EPP (3).** Para o Não Optante **e** para o MEI ele é
+  **proibido** (**E0162**). O motor o omite por `opSimpNac`, sem depender da config (o default
+  `regApTribSN=1` da dataclass não vaza para quem não é ME/EPP).
 - O motor implementa esse chaveamento em `dps.py` (`regTrib` e `totTrib`) e o validador só exige
   `pTotTribSN` quando `opSimpNac==3`. Regressão: `test_mei_usa_indtottrib_e_omite_regaptribsn`.
 
@@ -171,6 +175,13 @@ A regra de cada erro é **fiscal**, vale para qualquer linguagem. A "Solução" 
 | **E0315** | "não é permitido informar 000" (`cTribMun`) | município **sem desdobro** municipal | **omitir** `cTribMun` (é `minOccurs=0`) |
 | **E0676** | "não é permitido preencher os tributos federais quando o emitente é MEI" | bloco `tribFed` numa DPS de **MEI** | MEI recolhe no DAS-SIMEI → **omitir `tribFed`** (§3) |
 | **E0240** | "o CEP informado para o endereço nacional do tomador não existe ou não pertence ao município" | quase nunca é digitação: é o **CEP geral do município** (`xxxxx-000`) herdado de cadastro automático | §11 |
+| **E0162** | "não é permitido ao não optante e ao MEI preencherem o regime de apuração" | `regApTribSN` numa DPS de `opSimpNac` 1 ou 2 | `regApTribSN` **só** para ME/EPP (`opSimpNac=3`) — o motor omite (§3) |
+| **E0204** | "CNPJ ou CPF do tomador não foi informado, mas existe indicação de retenção do ISSQN" | `tpRetISSQN=2` sem `<toma>` identificado | retenção pelo tomador exige o tomador com documento (§15) |
+| **E0237** | "o endereço nacional do tomador deve ser informado quando o ISSQN for retido pelo tomador" | `tpRetISSQN=2` com o `<end>` do tomador ausente (ou omitido por estar incompleto) | endereço nacional **completo** do tomador (§7, §15) |
+| **E0583** · **E0588** · **E0580** | retenção do ISSQN não permitida | `tpRetISSQN` 2/3 com prestador **MEI** (E0583), com **regime especial** `regEspTrib≠0` (E0588), ou com `tribISSQN` imune/exportação/não incidência (E0580) | sem retenção (`tpRetISSQN=1`) nesses casos (§15) |
+| **E0617** | "não é permitido informar alíquota" (não optante) | `pAliq` numa DPS de **Não Optante** em município com convênio **ativo** — a alíquota é parametrizada pelo município e o SEFIN a aplica | **omitir `pAliq`** (§15) |
+| **E0698** | "se o CST for diferente de 00, 08 ou 09, o tipo de retenção do PIS/COFINS deve ser informado" | `piscofins/CST` tributável sem `tpRetPisCofins` | informar `tpRetPisCofins` (§12) |
+| **E0316** | "código da lista NBS inexistente" | `cNBS` fora da tabela NBS (Anexo B do Manual Integrado) | usar o Item da NBS que o portal oferece para aquele serviço (§14) |
 
 ### Código de serviço: `cTribNac` + `cTribMun`
 O código do portal no formato `00.00.00.000` decompõe em:
@@ -247,10 +258,40 @@ contribuinte é operação de município — o prestador recebe 404). Consequên
 
 ---
 
-## 8. IBS/CBS (reforma tributária) — próxima prioridade
+## 8. IBS/CBS (reforma tributária)
 
 O **leiaute** da DPS já está em **1.01** (RTC — NT 004 v2.0 / NT 007); ver `VERSAO_DPS` em `dps.py`.
-O grupo `IBSCBS` é **opcional no schema** (`minOccurs=0`) e o montador **ainda não o emite**.
+O grupo `IBSCBS` é **opcional no schema** (`minOccurs=0`) e o montador o emite **só quando a
+config pede** (`servico.ibscbs`, §14). Sem o bloco, a DPS sai exatamente como antes.
+
+### O que a DPS leva — e o que ela NÃO leva
+
+A DPS carrega só a **classificação** da operação; **nenhum valor** de IBS/CBS. Base de cálculo,
+alíquotas e valores são **calculados pelo SEFIN** e voltam na NFS-e (`infNFSe/IBSCBS`). Medido numa
+NFS-e de Regime Regular autorizada em produção (cStat 100, competência 10/2026): serviço de
+R$ 180,00 com ISS de 3% → a NFS-e trouxe `vBC` 174,60 (o serviço **menos o ISSQN**), IBS UF 0,10%
+(R$ 0,17), IBS municipal 0% e CBS 0,90% (R$ 1,57) — as alíquotas de teste de 2026.
+
+Ordem do XSD (`TCRTCInfoIBSCBS`), depois de `<valores>`, como último filho do `infDPS`:
+
+```
+<IBSCBS>
+  finNFSe        1      0 = NFS-e regular (única opção do leiaute)
+  indFinal       0-1    operação de uso ou consumo pessoal (art. 57 da LC 214): 0 = Não, 1 = Sim
+  cIndOp         1      código indicador da operação (tabela "INDOP", Anexo C) — 6 dígitos
+  (tpOper, gRefNFSe, tpEnteGov)   0-1   não cobertos
+  indDest        1      0 = o destinatário é o próprio tomador/adquirente; 1 = outro (exige <dest>)
+  (dest, imovel)                  0-1   não cobertos
+  <valores><trib><gIBSCBS>
+    CST          1      situação tributária do IBS/CBS — 3 dígitos (ex.: 000 = tributação integral)
+    cClassTrib   1      classificação tributária — 6 dígitos (ex.: 000001)
+  </gIBSCBS></trib></valores>
+</IBSCBS>
+```
+
+O portal do governo (EmissorWeb), para o caso comum (destinatário = adquirente, compra **não**
+governamental), emite exatamente esse mínimo: `finNFSe 0`, `indFinal 0`, `cIndOp`, `indDest 0` e
+`gIBSCBS` com `CST` + `cClassTrib`. É o que este montador reproduz.
 
 **Cronograma** (Ato Conjunto RFB/CGIBS nº 4, de 30/07/2026 — contado pelo **fato gerador**, que na
 NFS-e é o `dCompet`, não o dia da emissão):
@@ -268,10 +309,13 @@ Regime Regular isso custa dinheiro: a dispensa do recolhimento de 2026 é condic
 acessória (art. 348, § 1º). A data de 03/08/2026, citada em versões antigas deste
 documento, vale para **NF-e/NFC-e**, não para a NFS-e.
 
-Para os perfis atualmente suportados (Simples), emite-se **sem** o grupo **até 31/12/2026**.
+Para o **Simples**, emite-se **sem** o grupo **até 31/12/2026** (sem `servico.ibscbs`, nada muda).
+Para o **Regime Regular**, configure o grupo (§14) — ele já é obrigatório.
 
-Quando entrar em escopo (um prestador de Regime Regular, ou mudança do SEFIN), acrescentar o grupo
-(CST/cClassTrib, alíquotas IBS UF/Mun e CBS, `indZFMALC`) ao montador da DPS.
+Ainda **não cobertos** (o validador recusa a config em vez de emitir pela metade): destinatário
+diferente do adquirente (`indDest=1` → grupo `<dest>`), compra governamental (`tpEnteGov`), nota
+de ajuste/referência (`gRefNFSe`), imóvel, redução/diferimento (`gTribRegular`, `gDif`) e crédito
+presumido (`cCredPres`).
 
 ---
 
@@ -313,6 +357,10 @@ elemento quando ela vem vazia (regressão `test_prestador_sem_im_omite_o_element
 
 > ⚠️ **Homologação MENTE sobre IM/CNC.** O ambiente de produção restrita chega a devolver **E0116
 > com e sem** a IM, o que parece "bloqueio externo" e manda você caçar o problema no lugar errado.
+> E o contrário também acontece: um prestador cujas notas de **produção** saem **sem** IM (DPS
+> montada pelo próprio portal do governo, autorizada) levou **E0116** em homologação sem ela — e
+> foi autorizado lá só com a IM antiga do sistema da prefeitura. O CNC de homologação não é o de
+> produção.
 > Para **IM, CNC e adesão do município**, o único ambiente que responde a verdade é **produção**.
 > (No mesmo espírito: **nem todo município existe em homologação** — para muitos, não há teste
 > possível antes da nota real.)
@@ -372,6 +420,19 @@ Nenhum dos dois é "o certo" universal: **o critério é o XML que aquele contri
 Configurável por prestador em `servico.tributos.piscofins_cst` (`"00"` ou `"08"`). Não propague o
 valor de um contribuinte para os outros — cada um pede a sua conferência.
 
+### `tpRetPisCofins` — o tipo de retenção (NT 007)
+
+Depois do `CST`, o `piscofins` aceita `tpRetPisCofins`. A NT 007 ampliou o domínio para **0 a 9**
+(`0` = PIS/COFINS/CSLL não retidos, `1` = PIS/COFINS retidos, `3` = PIS/COFINS/CSLL retidos…); a
+revisão antiga do XSD só tinha `1`/`2`. O SEFIN de produção aceita a nova (nota do Regime Regular
+autorizada com `CST 00` + `tpRetPisCofins 0`, emitida pelo próprio portal do governo).
+
+- **Obrigatório** quando o CST é tributável — qualquer um **fora** de `00`, `08` e `09` (**E0698**).
+- Opcional nos outros; o portal manda `0` junto do `CST 00` no Regime Regular.
+
+Configurável em `servico.tributos.tpRetPisCofins` (um dígito). Sem ele, o elemento é omitido e a
+DPS do Simples sai idêntica à de sempre.
+
 > **MEI é exceção total:** não emite o bloco `tribFed` (nem PIS/COFINS), sob pena de **E0676** — ele
 > recolhe os federais no DAS-SIMEI (§3).
 
@@ -405,3 +466,109 @@ com a autoridade que importa. Ela é **documento fiscal**: cancele pelo caminho 
 (direto ou por pedido de análise) e **registre** o que foi feito. Antes de qualquer canário, valide
 a DPS localmente e compare-a **campo a campo** com uma nota antiga do mesmo contribuinte — o canário
 é para confirmar o que você já acha que sabe, não para descobrir no escuro.
+
+---
+
+## 14. ★ Regime Regular (Não Optante — Lucro Presumido/Real): a DPS é outra
+
+O prestador **fora do Simples** (`opSimpNac=1`) não monta a DPS do ME/EPP com um número trocado.
+Cinco pontos mudam, e cada um custa uma rejeição ou uma nota em desconformidade. Fonte da verdade:
+uma NFS-e de Lucro Presumido **emitida pelo próprio portal do governo** (EmissorWeb) e autorizada
+em produção (cStat 100) — o mesmo método do §13.
+
+| Elemento | ME/EPP (`opSimpNac=3`) | **Não Optante (`opSimpNac=1`)** |
+|---|---|---|
+| `regTrib/regApTribSN` | presente | **omitido** — informar dá **E0162** (§3) |
+| `prest/IM` | conforme o CNC (§10) | conforme o CNC (§10) — o portal omitiu num município que tinha IM no sistema antigo da prefeitura, e a SEFIN aceitou |
+| `cServ/cNBS` | opcional | o portal manda (o **Item da NBS** é obrigatório na tela do Regime Regular) |
+| `tribMun/pAliq` | ver §15 | **omitido** em município com convênio ativo (**E0617**): a alíquota vem da parametrização municipal |
+| `tribFed/piscofins` | `CST` (default `08`, §12) | `CST 00` + `tpRetPisCofins 0` no portal (§12) |
+| `totTrib` | `pTotTribSN` | **`pTotTrib`** (federal/estadual/municipal) — ou `indTotTrib` |
+| grupo `IBSCBS` | a partir de 01/01/2027 | **obrigatório** desde 01/10/2026 (§8) |
+
+### `totTrib/pTotTrib` — o valor aproximado dos tributos (Lei 12.741/2012)
+
+O Não Optante pode declarar `indTotTrib=0` (não informar), mas o portal emite o **percentual
+aproximado** em três parcelas, cada uma de 0 a 100% (**E0706–E0708**):
+
+```xml
+<totTrib><pTotTrib>
+  <pTotTribFed>11.33</pTotTribFed>   <!-- PIS 0,65 + COFINS 3,00 + IRPJ 4,80 + CSLL 2,88 -->
+  <pTotTribEst>0.00</pTotTribEst>
+  <pTotTribMun>3.00</pTotTribMun>    <!-- a alíquota do ISS do serviço -->
+</pTotTrib></totTrib>
+```
+
+O exemplo é o de um serviço no **Lucro Presumido** (presunção de 32%: IRPJ 15% × 32% = 4,80%;
+CSLL 9% × 32% = 2,88%; PIS/COFINS cumulativos 0,65% + 3%). Os números são da **contabilidade** do
+prestador — não há fórmula universal: atividade com presunção diferente, adicional de IRPJ ou ISS
+de outra alíquota mudam a soma. Configurável em `servico.tributos.pTotTrib` (as três chaves do
+XSD). Esta biblioteca só o aceita para o Não Optante: para o ME/EPP o caminho é o `pTotTribSN` e
+o MEI é isento (Decreto 8.264/2014, §3).
+
+### `cNBS` — o Item da NBS
+
+`serv/cServ/cNBS` (9 dígitos, tabela NBS do Anexo B do Manual Integrado), **depois** do `xDescServ`.
+É opcional no XSD que o SEFIN aplica em produção (DPS do Simples sem ele é autorizada), mas o
+portal o exige do Regime Regular e ele classifica o serviço para o IBS/CBS. Código fora da tabela
+dá **E0316**. Configurável em `servico.cNBS`; vazio omite o elemento.
+
+### O grupo IBS/CBS
+
+Configurável em `servico.ibscbs` (§8): `cIndOp`, `CST`, `cClassTrib` (obrigatórios no bloco),
+`indFinal` (opcional), `finNFSe` e `indDest` (só `0` é suportado). O exemplo do portal para
+manutenção de máquinas de um adquirente PJ: `cIndOp 050101`, `CST 000`, `cClassTrib 000001`,
+`indFinal 0`, `indDest 0`. Os códigos são **decisão da contabilidade**, por operação — não copie
+de outro prestador.
+
+---
+
+## 15. ★ ISS retido pelo tomador (`tpRetISSQN=2`)
+
+A retenção é propriedade da **operação** (de quem é o tomador), não do prestador: o mesmo prestador
+emite notas retidas para os tomadores que a lei municipal obriga a reter e não retidas para os
+outros. A config desta biblioteca é **por prestador** — quem emite para os dois tipos de tomador
+monta a config da nota com `servico.tributos.tpRetISSQN = 2` só naquela emissão.
+
+`tpRetISSQN`: `1` = não retido (default) · `2` = retido pelo tomador · `3` = retido pelo
+intermediário (exige o grupo `<interm>`, **não coberto**).
+
+### O que a retenção exige — e proíbe
+
+| Regra | E-code |
+|---|---|
+| o tomador tem de estar **identificado** (CPF/CNPJ) | **E0204** |
+| o **endereço nacional** do tomador é **obrigatório** (o `<end>` deixa de ser opcional) | **E0237** |
+| MEI não sofre retenção | **E0583** |
+| prestador com regime especial (`regEspTrib≠0`) não sofre retenção | **E0588** |
+| serviço imune, exportado ou sem incidência (`tribISSQN` 2/3/4) não tem retenção | **E0580** |
+
+⚠️ O E0237 é o que pega de surpresa: o `<end>` do tomador é bloco **atômico** (§7) — se faltar um
+campo, ele some inteiro, e a nota que sairia "sem o endereço" com ISS não retido passa a ser
+**rejeitada** com retenção. O validador desta biblioteca confere os dois (E0204/E0237) antes do
+envio.
+
+### `pAliq` — quando a alíquota vai na DPS
+
+Quem decide é o regime, o convênio do município de incidência e a retenção:
+
+| Prestador | Convênio do município | Retenção | `pAliq` |
+|---|---|---|---|
+| Não Optante (`opSimpNac=1`) | **ativo** | qualquer | **proibido** (E0617) — o SEFIN aplica a alíquota parametrizada |
+| Não Optante | não ativo (e `regEspTrib=0`) | qualquer | obrigatório (E0619) |
+| ME/EPP, ISS pelo SN (`regApTribSN=1`) | qualquer | **sim** (`tpRetISSQN` 2/3) | **obrigatório** (E0621/E0628), mínimo 1,8% |
+| ME/EPP, ISS pelo SN | qualquer | não | proibido (E0625/E0631) |
+| ME/EPP, ISS fora do SN (`regApTribSN` 2/3) | ativo | — | proibido (E0635) |
+| ME/EPP, ISS fora do SN | não ativo | — | obrigatório (E0640) |
+
+Esta biblioteca **não emite `pAliq`**: ela cobre o Não Optante em município com convênio ativo
+(retido ou não) e o ME/EPP sem retenção. O ME/EPP com ISS **retido** precisaria da alíquota — o
+validador recusa essa config (E0621) em vez de deixar a DPS ir para a rejeição.
+
+### Na NFS-e
+
+Medido em homologação (Regime Regular, serviço de R$ 100,00, ISS 3%, mesma DPS com
+`tpRetISSQN` 1 e 2): com a retenção a NFS-e devolve `vTotalRet` = o ISSQN (3,00) e `vLiq` =
+97,00 — o valor que o prestador recebe; sem ela, `vTotalRet` some e `vLiq` = 100,00. A base do
+IBS/CBS foi 97,00 **nos dois casos** (o serviço menos o ISSQN, retido ou não — §8). O DANFSe
+imprime "Retenção do ISSQN: Retido pelo Tomador".

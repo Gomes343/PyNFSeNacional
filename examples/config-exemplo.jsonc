@@ -24,7 +24,8 @@
                                               //   deixe null (mandar dá E0120). Nunca de enfeite
     "regime": {                               // ★ regime tributário
       "opSimpNac": 3,                         //   1=Não Optante · 2=MEI · 3=Optante ME/EPP
-      "regApTribSN": 1,                       //   apuração do SN (se optante)
+      "regApTribSN": 1,                       //   apuração do SN — só ME/EPP (opSimpNac=3);
+                                              //   Não Optante e MEI: omitido pelo motor (E0162)
       "regEspTrib": 0                         //   0=Nenhum
     }
     // nome/endereço do prestador NÃO entram aqui: o SEFIN puxa do cadastro (E0128/E0121)
@@ -40,8 +41,26 @@
     "tributos": {
       "pTotTribSN": "6.00",                   // ★ se Simples ME/EPP: % efetiva do Simples
       "piscofins_cst": "08"                   //   CST do PIS/COFINS: "08"=Operação sem Incidência
-    }                                         //   (default) · "00"=Nenhum. Confira no XML que o
+                                              //   (default) · "00"=Nenhum. Confira no XML que o
                                               //   próprio contribuinte já emitiu (MEI não usa)
+      // ↓ OPCIONAIS (sem eles a DPS do Simples/MEI sai exatamente igual):
+      // "tpRetISSQN": 2,                     //   ISS retido pelo tomador — é da NOTA: exige o
+      //                                      //   tomador identificado e com endereço (E0204/E0237)
+      // "tpRetPisCofins": "0",               //   tipo de retenção do PIS/COFINS (0–9, NT 007);
+      //                                      //   obrigatório com CST fora de 00/08/09 (E0698)
+      // "pTotTrib": {                        //   Não Optante: % aproximado dos tributos (Lei
+      //   "pTotTribFed": "11.33",            //   12.741) em 3 parcelas, 0–100 cada — os números
+      //   "pTotTribEst": "0.00",             //   são da contabilidade do prestador (§14)
+      //   "pTotTribMun": "3.00"
+      // }
+    }
+    // "cNBS": "120015000",                   //   Item da NBS (9 díg), depois do xDescServ (§14)
+    // "ibscbs": {                            //   grupo IBS/CBS (§8): só a CLASSIFICAÇÃO — o SEFIN
+    //   "cIndOp": "050101",                  //   calcula os valores. Obrigatório no Regime
+    //   "CST": "000",                        //   Regular desde 01/10/2026; Simples a partir de
+    //   "cClassTrib": "000001",              //   01/01/2027
+    //   "indFinal": "0"
+    // }
   },
 
   "dados_nota": {                             // EXEMPLO p/ teste manual; em uso real os dados

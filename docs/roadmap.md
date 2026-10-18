@@ -23,11 +23,13 @@
 - Homologação **e** produção, com contadores separados.
 
 **Fora do v0.1 (próximas versões):**
-- IBS/CBS — o **leiaute** da DPS já está em **1.01** (RTC), mas o **grupo `IBSCBS` ainda não é
-  emitido**: obrigatório na NFS-e para o **Regime Regular** desde 01/10/2026 e para o **Simples
-  a partir de 01/01/2027** (Ato Conjunto RFB/CGIBS nº 4/2026). Ver §8 do conhecimento.
+- IBS/CBS — o grupo `IBSCBS` é emitido quando a config o pede (`servico.ibscbs`, §8/§14): o
+  **Regime Regular** já o tem (obrigatório desde 01/10/2026). Falta o do **Simples**, obrigado a
+  partir de 01/01/2027 (Ato Conjunto RFB/CGIBS nº 4/2026), e os casos não cobertos do grupo
+  (destinatário ≠ adquirente, compra governamental, referência, imóvel, redução/diferimento).
 - Tomador estrangeiro / sem documento (consumidor final é só "omitir `<toma>`", esse entra fácil).
-- Não-optantes (Lucro Presumido/Real) — usam `indTotTrib` em vez de `pTotTribSN`.
+- ~~Não-optantes (Lucro Presumido/Real)~~ — feito (§14): `pTotTrib`, `tpRetPisCofins`, `cNBS`,
+  sem `regApTribSN` (E0162). E o ISS retido pelo tomador (§15). Falta o `pAliq` (§15).
 - Eventos (cancelamento, substituição).
 - Auto-resolver razão social de CNPJ via BrasilAPI (conveniência).
 

@@ -145,8 +145,8 @@ Cada prestador é descrito por um **JSON puro**. Comece copiando o exemplo anota
     "inscricao_municipal": null,        //   OPCIONAL — quem decide é o CNC, POR CNPJ (E0116 ×
                                         //   E0120). Sem IM no CNC: deixe null. Nunca "de enfeite"
     "regime": {                         // ★ regime tributário
-      "opSimpNac": 3,                   //   1=Não Optante (roadmap) · 2=MEI · 3=Optante ME/EPP
-      "regApTribSN": 1,
+      "opSimpNac": 3,                   //   1=Não Optante · 2=MEI · 3=Optante ME/EPP
+      "regApTribSN": 1,                 //   só ME/EPP (Não Optante e MEI: omitido, E0162)
       "regEspTrib": 0
     }
     // nome/endereço do prestador NÃO entram aqui: o SEFIN puxa do cadastro (E0128/E0121)
@@ -162,7 +162,15 @@ Cada prestador é descrito por um **JSON puro**. Comece copiando o exemplo anota
     "tributos": {
       "pTotTribSN": "6.00",             // ★ se Simples ME/EPP: % efetiva do Simples Nacional
       "piscofins_cst": "08"             //   CST do PIS/COFINS: "08"=sem incidência (default),
-    }                                   //   "00"=nenhum. Confira no XML do próprio contribuinte
+                                        //   "00"=nenhum. Confira no XML do próprio contribuinte
+      // "tpRetISSQN": 2,               //   ISS retido pelo tomador (por NOTA — §15)
+      // "tpRetPisCofins": "0",         //   tipo de retenção do PIS/COFINS (NT 007 — §12)
+      // "pTotTrib": {"pTotTribFed": "11.33", "pTotTribEst": "0", "pTotTribMun": "3"}
+                                        //   Não Optante: % aproximado em 3 parcelas (§14)
+    }
+    // "cNBS": "120015000",             //   Item da NBS (9 díg) — Regime Regular (§14)
+    // "ibscbs": {"cIndOp": "050101", "CST": "000", "cClassTrib": "000001", "indFinal": "0"}
+                                        //   grupo IBS/CBS — obrigatório no Regime Regular (§8)
   }
 }
 ```
@@ -231,10 +239,12 @@ config (JSON)  →  montar DPS (XML)  →  assinar (XMLDSIG)  →  gzip+base64 �
 - ✅ **Inscrição Municipal opcional** (regra do CNC por CNPJ) e `cTribMun` omitido onde o município não usa — v0.5.0
 - ✅ **Margem anti-E0008** no `dhEmi` e **informações complementares** (`xInfComp`) — v1.0.0
 - ⏳ Endurecimento a partir de mais emissões reais
-- ⏳ Tomador estrangeiro / sem documento; não-optantes (Lucro Presumido/Real)
-- ⏳ Grupo **IBS/CBS** na DPS — **próxima prioridade.** Obrigatório na NFS-e para o **Regime Regular**
-  desde 01/10/2026 (sem rejeição até 31/12/2026) e para o **Simples Nacional a partir de 01/01/2027**
-  (Ato Conjunto RFB/CGIBS nº 4/2026); **ainda não emitido**
+- ✅ **Regime Regular** (Não Optante — Lucro Presumido/Real): `pTotTrib`, `tpRetPisCofins`, Item da NBS
+  e o **grupo IBS/CBS** (classificação: `cIndOp`, `CST`, `cClassTrib`) — **ainda não publicado**
+- ✅ **ISS retido pelo tomador** (`tpRetISSQN=2`), com a recusa local de E0204/E0237 — **ainda não publicado**
+- ⏳ Grupo IBS/CBS do **Simples Nacional** (obrigatório a partir de 01/01/2027, Ato Conjunto RFB/CGIBS
+  nº 4/2026) e os casos ainda não cobertos do grupo: destinatário ≠ adquirente, compra governamental
+- ⏳ Tomador estrangeiro / sem documento; `pAliq` (ISS retido de ME/EPP, município não conveniado)
 - ⏳ Eventos (cancelamento e substituição)
 - ⏳ DANFSe: exibir o **total aproximado de tributos** do Simples (`pTotTribSN`, Lei 12.741) — hoje sai como "—" (o `BrazilFiscalReport` não lê esse campo)
 

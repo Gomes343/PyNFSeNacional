@@ -8,6 +8,9 @@ Regras-chave (E-codes):
   • MEI (opSimpNac=2): ISENTO do valor aproximado dos tributos (Decreto 8.264/2014) →
     totTrib/indTotTrib=0 (NÃO pTotTribSN), regTrib SEM regApTribSN, e SEM o bloco tribFed
     (E0676: MEI não pode preencher tributos federais — recolhe no DAS-SIMEI) — como o EmissorWeb.
+  • regApTribSN é EXCLUSIVO do ME/EPP: Não Optante e MEI que o informam levam E0162.
+  • Regime Regular (opSimpNac=1, §14): cNBS, tpRetPisCofins, totTrib/pTotTrib e o grupo IBSCBS
+    — todos OPCIONAIS por config; sem eles a DPS sai exatamente como antes.
   • totTrib é sempre obrigatório — E1235.
   • verAplic ≤ 20 chars — E1235.
   • fuso America/Sao_Paulo ao gerar dhEmi — E0008 (módulo relogio).
@@ -27,7 +30,7 @@ from typing import Any
 from lxml import etree
 
 from . import documentos
-from .config import ClienteConfig
+from .config import PTOTTRIB_CHAVES, ClienteConfig, percentual
 
 _log = logging.getLogger(__name__)
 
@@ -81,17 +84,7 @@ def _montar_end_toma(toma: etree._Element, end: Any) -> None:
     """
     if not isinstance(end, dict) or not end:
         return
-    cmun = documentos.digitos(end.get("cMun") or end.get("codigo_municipio") or end.get("ibge"))
-    cep = documentos.digitos(end.get("cep") or end.get("CEP"))
-    xlgr = str(end.get("logradouro") or end.get("xLgr") or "").strip()
-    bairro = str(end.get("bairro") or end.get("xBairro") or "").strip()
-    nro = str(end.get("numero") or end.get("nro") or "").strip() or "S/N"
-    faltando = [
-        nome for nome, ok in (
-            ("cMun (7 díg)", len(cmun) == 7), ("CEP (8 díg)", len(cep) == 8),
-            ("logradouro", bool(xlgr)), ("bairro", bool(bairro)),
-        ) if not ok
-    ]
+    campos, faltando = documentos.endereco_nacional(end)   # a MESMA regra do validador (E0237)
     if faltando:
         # Parcial = E1235 → omite o endereço INTEIRO (atômico). Avisa: guarda calada vira nota
         # emitida "com sucesso" sem o endereço que o chamador achou que tinha mandado.
@@ -102,14 +95,13 @@ def _montar_end_toma(toma: etree._Element, end: Any) -> None:
         return
     el_end = _el(toma, "end")
     endnac = _el(el_end, "endNac")
-    _el(endnac, "cMun", cmun)
-    _el(endnac, "CEP", cep)
-    _el(el_end, "xLgr", xlgr[:255])
-    _el(el_end, "nro", nro[:60])
-    cpl = str(end.get("complemento") or end.get("xCpl") or "").strip()
-    if cpl:
-        _el(el_end, "xCpl", cpl[:156])
-    _el(el_end, "xBairro", bairro[:60])
+    _el(endnac, "cMun", campos["cMun"])
+    _el(endnac, "CEP", campos["CEP"])
+    _el(el_end, "xLgr", campos["xLgr"][:255])
+    _el(el_end, "nro", campos["nro"][:60])
+    if campos["xCpl"]:
+        _el(el_end, "xCpl", campos["xCpl"][:156])
+    _el(el_end, "xBairro", campos["xBairro"][:60])
 
 
 def montar_dps(
@@ -160,8 +152,10 @@ def montar_dps(
     reg = _el(prest, "regTrib")
     _el(reg, "opSimpNac", str(r.opSimpNac))
     # regApTribSN (regime de apuração do SN) só se aplica a ME/EPP optante (opSimpNac=3).
-    # MEI (opSimpNac=2) NÃO o informa — o EmissorWeb do gov o omite; incluí-lo destoa da nota real.
-    if r.opSimpNac != 2 and r.regApTribSN is not None:
+    # MEI (2) e Não Optante (1) NÃO o informam — E0162 ("não é permitido ao não optante e ao MEI
+    # preencherem o regime de apuração"). O chaveamento é do motor: o default 1 da dataclass não
+    # pode vazar para quem não é ME/EPP (§3).
+    if r.opSimpNac == 3 and r.regApTribSN is not None:
         _el(reg, "regApTribSN", str(r.regApTribSN))
     _el(reg, "regEspTrib", str(r.regEspTrib))
 
@@ -199,6 +193,11 @@ def montar_dps(
     if s.cTribMun:
         _el(cserv, "cTribMun", str(s.cTribMun))
     _el(cserv, "xDescServ", descricao or s.descricao_padrao)
+    # Item da NBS (TCCServ: cTribNac → cTribMun? → xDescServ → cNBS? → cIntContrib?). Opcional:
+    # vazio omite — a DPS do Simples segue idêntica (§14).
+    nbs = documentos.digitos(s.cNBS)
+    if nbs:
+        _el(cserv, "cNBS", nbs)
     # infoCompl (0-1) é o ÚLTIMO filho de <serv> no XSD (TCServ) — depois de locPrest/cServ e de
     # comExt/obra/atvEvento/explRod, que não emitimos. Texto livre, sem efeito fiscal: o SEFIN não
     # o interpreta e o DANFSe o imprime como "Inf. Cont.:". Vazio → o grupo inteiro é OMITIDO
@@ -222,15 +221,62 @@ def montar_dps(
         tf = _el(trib, "tribFed")
         pc = _el(tf, "piscofins")
         _el(pc, "CST", str(s.tributos.get("piscofins_cst", "08")))
+        # tpRetPisCofins é o ÚLTIMO filho de piscofins (depois de vBCPisCofins/pAliq*/vPis/vCofins,
+        # que não emitimos). Obrigatório quando o CST é tributável (E0698); sem ele, omitido (§12).
+        tprp = s.tributos.get("tpRetPisCofins")
+        if tprp is not None and str(tprp).strip():
+            _el(pc, "tpRetPisCofins", str(tprp).strip())
     tt = _el(trib, "totTrib")
     # totTrib (choice) depende do regime tributário:
     #  • Não Optante (1) e MEI (2): indTotTrib. O MEI é ISENTO de declarar o valor aproximado dos
     #    tributos (Decreto 8.264/2014) — a nota real do EmissorWeb sai com indTotTrib=0.
     #  • ME/EPP optante do Simples (3): pTotTribSN (% total aprox. — Lei da Transparência).
     #    E0712 PROÍBE indTotTrib para ME/EPP.
-    if r.opSimpNac in (1, 2):
+    #  • Não Optante (1) com `pTotTrib` configurado: o percentual aproximado em três parcelas
+    #    (federal/estadual/municipal) — o que o portal emite para o Regime Regular (§14).
+    ptt = s.tributos.get("pTotTrib")
+    if r.opSimpNac == 1 and isinstance(ptt, dict) and ptt:
+        g = _el(tt, "pTotTrib")
+        for chave in PTOTTRIB_CHAVES:
+            _el(g, chave, _dec2(ptt.get(chave), f"servico.tributos.pTotTrib.{chave}"))
+    elif r.opSimpNac in (1, 2):
         _el(tt, "indTotTrib", str(s.tributos.get("indTotTrib", 0)))
     else:
         _el(tt, "pTotTribSN", str(s.tributos.get("pTotTribSN", "0.00")))
 
+    # Grupo IBS/CBS (§8): último filho do infDPS, depois de <valores>. Só a CLASSIFICAÇÃO da
+    # operação — base, alíquotas e valores o SEFIN calcula. Sem `servico.ibscbs`, omitido.
+    if s.ibscbs:
+        _montar_ibscbs(inf, s.ibscbs)
+
     return str(etree.tostring(dps, encoding="unicode"))
+
+
+def _dec2(valor: Any, nome: str) -> str:
+    """Percentual com 2 casas (TSDec3V2). Ausente/não numérico levanta — escrever 0.00 no lugar
+    seria declarar um tributo que ninguém informou."""
+    v = percentual(valor)
+    if v is None:
+        raise ValueError(f"{nome}: percentual ausente ou não numérico ({valor!r})")
+    return f"{v:.2f}"
+
+
+def _montar_ibscbs(inf: etree._Element, ibs: dict[str, Any]) -> None:
+    """Grupo IBSCBS na ordem do XSD (TCRTCInfoIBSCBS): finNFSe → indFinal? → cIndOp → indDest
+    → valores/trib/gIBSCBS(CST → cClassTrib). Os opcionais não cobertos (tpOper, gRefNFSe,
+    tpEnteGov, dest, imovel, gReeRepRes, cCredPres, gTribRegular, gDif) o validar() recusa."""
+    def obrig(chave: str) -> str:
+        v = str(ibs.get(chave) or "").strip()
+        if not v:
+            raise ValueError(f"servico.ibscbs.{chave} é obrigatório no grupo IBS/CBS")
+        return v
+
+    g = _el(inf, "IBSCBS")
+    _el(g, "finNFSe", str(ibs.get("finNFSe", "0")).strip())
+    if ibs.get("indFinal") is not None and str(ibs["indFinal"]).strip():
+        _el(g, "indFinal", str(ibs["indFinal"]).strip())
+    _el(g, "cIndOp", obrig("cIndOp"))
+    _el(g, "indDest", str(ibs.get("indDest", "0")).strip())
+    gi = _el(_el(_el(g, "valores"), "trib"), "gIBSCBS")
+    _el(gi, "CST", obrig("CST"))
+    _el(gi, "cClassTrib", obrig("cClassTrib"))
