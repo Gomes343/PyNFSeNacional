@@ -5,6 +5,8 @@ versionamento [SemVer](https://semver.org/lang/pt-BR/).
 
 ## [Não publicado]
 
+## [1.1.0] - 2026-10-26
+
 ### Adicionado
 - **Regime Regular (Não Optante — Lucro Presumido/Real)**, conferido contra a DPS que o próprio
   portal do governo monta e o SEFIN autoriza (§14): `servico.cNBS` (Item da NBS),

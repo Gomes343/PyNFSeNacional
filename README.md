@@ -240,8 +240,8 @@ config (JSON)  →  montar DPS (XML)  →  assinar (XMLDSIG)  →  gzip+base64 �
 - ✅ **Margem anti-E0008** no `dhEmi` e **informações complementares** (`xInfComp`) — v1.0.0
 - ⏳ Endurecimento a partir de mais emissões reais
 - ✅ **Regime Regular** (Não Optante — Lucro Presumido/Real): `pTotTrib`, `tpRetPisCofins`, Item da NBS
-  e o **grupo IBS/CBS** (classificação: `cIndOp`, `CST`, `cClassTrib`) — **ainda não publicado**
-- ✅ **ISS retido pelo tomador** (`tpRetISSQN=2`), com a recusa local de E0204/E0237 — **ainda não publicado**
+  e o **grupo IBS/CBS** (classificação: `cIndOp`, `CST`, `cClassTrib`) — v1.1.0
+- ✅ **ISS retido pelo tomador** (`tpRetISSQN=2`), com a recusa local de E0204/E0237 — v1.1.0
 - ⏳ Grupo IBS/CBS do **Simples Nacional** (obrigatório a partir de 01/01/2027, Ato Conjunto RFB/CGIBS
   nº 4/2026) e os casos ainda não cobertos do grupo: destinatário ≠ adquirente, compra governamental
 - ⏳ Tomador estrangeiro / sem documento; `pAliq` (ISS retido de ME/EPP, município não conveniado)

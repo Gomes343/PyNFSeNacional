@@ -89,7 +89,7 @@ ponta a ponta: **validar → montar DPS → assinar → transporte mTLS → Nota
     e o `validar()` **recusa** IM sem dígito significativo (IM de enfeite vira nota real com dado
     falso). A omissão atômica do endereço do tomador passou a **logar WARNING** com os nomes dos
     campos que faltaram (nunca os valores). Regra completa em `docs/conhecimento-fiscal.md` §10–§13.
-  - **Regime Regular + ISS retido (18/10/2026, não publicado):** `cNBS`, `tpRetPisCofins`,
+  - **Regime Regular + ISS retido (18/10/2026, publicado na v1.1.0):** `cNBS`, `tpRetPisCofins`,
     `pTotTrib`, grupo `IBSCBS` (classificação) e `tpRetISSQN=2` com `validar_retencao` (E0204/E0237),
     todos opcionais por config; `regApTribSN` virou exclusivo do ME/EPP (E0162). Alvo: a DPS que o
     PORTAL monta para um prestador do Lucro Presumido e o SEFIN autorizou — `tests/test_regime_regular.py`
