@@ -17,7 +17,15 @@ from lxml import etree
 
 from . import assinatura, dfe, dps, eventos, sefin
 from . import chave as _chave
-from .config import ClienteConfig, ConfigError, validar_retencao, validar_tomador
+from .config import (
+    LEIAUTE_NT009,
+    LEIAUTE_PRODUCAO,
+    ClienteConfig,
+    ConfigError,
+    leiaute_do_ambiente,
+    validar_retencao,
+    validar_tomador,
+)
 
 # A lib só EMITE logs; quem configura handler/nível é a aplicação (a CLI faz no --verbose).
 # Nunca logamos a senha do .pfx nem o XML com dados do tomador — só Id, ambiente, E-code, nNFSe.
@@ -64,6 +72,17 @@ class ResultadoEvento:
     erro_codigo: str | None = None
     erro_msg: str | None = None
     erros: list[dict[str, str | None]] = field(default_factory=list)
+
+
+def _dica_leiaute(msg: str | None, codigo: str | None, leiaute: str) -> str | None:
+    """E1235 que cita o `finNFSe` é o SEFIN aplicando o OUTRO pacote do XSD (§19) — o sinal de
+    que a produção virou de leiaute antes da lib. A dica diz qual configurar; o `[E1235]` fica
+    na frente, porque é por ele que quem chama classifica o erro."""
+    if codigo != "E1235" or not msg or "finNFSe" not in msg:
+        return msg
+    outro = LEIAUTE_PRODUCAO if leiaute == LEIAUTE_NT009 else LEIAUTE_NT009
+    return (f"{msg} — o SEFIN deste ambiente parece aplicar o leiaute {outro} do XSD; a DPS foi no "
+            f"{leiaute}. Configure \"leiaute\": \"{outro}\" (docs §19)")
 
 
 def _doc(tomador: dict[str, Any] | None) -> str:
@@ -184,8 +203,9 @@ class Emissor:
             chave_acesso=resp.chave_acesso,
             nfse_xml=resp.nfse_xml,
             id_dps=idd,
-            erro_msg=(f"[{resp.erro_codigo}] {resp.erro_msg}"
-                      if resp.erro_codigo else resp.erro_msg),
+            erro_msg=_dica_leiaute(
+                f"[{resp.erro_codigo}] {resp.erro_msg}" if resp.erro_codigo else resp.erro_msg,
+                resp.erro_codigo, self.cfg.leiaute or leiaute_do_ambiente(self.ambiente)),
             erros=resp.erros,
             alertas=resp.alertas,
         )

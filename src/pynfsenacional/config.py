@@ -30,6 +30,20 @@ _PTOTTRIB_ECODE = {"pTotTribFed": "E0706", "pTotTribEst": "E0707", "pTotTribMun"
 # servico.ibscbs (§8/§14): o que este montador sabe emitir. Chave fora daqui é recusada pelo
 # validar() — emitir o grupo sem o que a config pediu seria nota em desconformidade, calada.
 IBSCBS_CHAVES = ("finNFSe", "indFinal", "cIndOp", "indDest", "CST", "cClassTrib")
+# Leiaute do XSD (§19). Os dois pacotes oficiais têm a mesma `versao="1.01"`, então quem diz qual
+# vale é a DATA do pacote: 20260209 é o de produção; 20261020 é o da produção restrita (NT 009),
+# que a homologação aplica desde 31/10/2026. Sem `leiaute` na config, vale o do ambiente.
+LEIAUTE_PRODUCAO = "20260209"
+LEIAUTE_NT009 = "20261020"
+LEIAUTES = (LEIAUTE_PRODUCAO, LEIAUTE_NT009)
+_LEIAUTE_DO_AMBIENTE = {"producao": LEIAUTE_PRODUCAO, "homologacao": LEIAUTE_NT009}
+
+
+def leiaute_do_ambiente(ambiente: str) -> str:
+    """O leiaute que o SEFIN do ambiente aplica hoje (§19)."""
+    return _LEIAUTE_DO_AMBIENTE.get(ambiente, LEIAUTE_PRODUCAO)
+
+
 # CST do PIS/COFINS que dispensam o tipo de retenção (E0698): Nenhum, sem incidência, suspensão.
 _CST_SEM_TPRET = ("00", "08", "09")
 
@@ -139,6 +153,9 @@ class ClienteConfig:
     servico: Servico
     ambiente: str = "homologacao"
     dados_nota: dict[str, Any] = field(default_factory=dict)
+    # Leiaute do XSD (§19): vazio = o que o SEFIN do ambiente aplica (`leiaute_do_ambiente`).
+    # Forçar um valor só serve para a virada — quando a produção trocar de pacote antes da lib.
+    leiaute: str = ""
 
     # ── carregamento ──────────────────────────────────────────────────────────
     @classmethod
@@ -168,6 +185,7 @@ class ClienteConfig:
             servico=servico,
             ambiente=d.get("ambiente", "homologacao"),
             dados_nota=d.get("dados_nota", {}),
+            leiaute=str(d.get("leiaute") or "").strip(),
         )
 
     @classmethod
@@ -255,6 +273,11 @@ class ClienteConfig:
         if self.ambiente not in _AMBIENTES:
             problemas.append(
                 f"ambiente inválido: {self.ambiente!r} (use 'homologacao' ou 'producao')"
+            )
+        if self.leiaute and self.leiaute not in LEIAUTES:
+            problemas.append(
+                f"leiaute inválido: {self.leiaute!r} (use {' ou '.join(LEIAUTES)}, ou deixe vazio "
+                "para o do ambiente) — §19"
             )
         return problemas
 
@@ -367,6 +390,12 @@ class ClienteConfig:
             if "indFinal" in ibs and str(ibs["indFinal"]).strip() not in ("0", "1"):
                 problemas.append(
                     f"servico.ibscbs.indFinal deve ser 0 ou 1; recebido {ibs['indFinal']!r}"
+                )
+            # Medido em homologação (31/10/2026, Simples com o grupo): sem o Item da NBS o SEFIN
+            # recusa qualquer DPS com IBS/CBS — vale para todo regime, não só o Regular.
+            if not documentos.digitos(s.cNBS):
+                problemas.append(
+                    "E0322: o grupo IBS/CBS exige o Item da NBS (servico.cNBS, 9 dígitos) — §8"
                 )
             if str(ibs.get("indDest", "0")).strip() != "0":
                 problemas.append(

@@ -6,11 +6,12 @@ O byte-diff canônico contra a referência PHP fica em test_golden.py.
 
 from __future__ import annotations
 
+import pytest
 from conftest import CONFIG_VALIDA
 from lxml import etree
 
 from pynfsenacional import dps
-from pynfsenacional.config import ClienteConfig
+from pynfsenacional.config import LEIAUTE_NT009, LEIAUTE_PRODUCAO, ClienteConfig
 
 NS = "http://www.sped.fazenda.gov.br/nfse"
 
@@ -47,11 +48,12 @@ def _montar(cfg, **kw):
     return dps.montar_dps(cfg, **base)
 
 
-def test_estrutura_e_ordem():
-    inf = _inf(_montar(ClienteConfig.from_dict(CONFIG_VALIDA)))
+@pytest.mark.parametrize("leiaute,fin", [(LEIAUTE_PRODUCAO, []), (LEIAUTE_NT009, ["finNFSe"])])
+def test_estrutura_e_ordem(leiaute, fin):
+    inf = _inf(_montar(ClienteConfig.from_dict(CONFIG_VALIDA), leiaute=leiaute))
     ordem = [etree.QName(c).localname for c in inf]
     assert ordem == ["tpAmb", "dhEmi", "verAplic", "serie", "nDPS", "dCompet",
-                     "tpEmit", "cLocEmi", "prest", "toma", "serv", "valores"]
+                     "tpEmit", *fin, "cLocEmi", "prest", "toma", "serv", "valores"]
     assert _txt(inf, "tpAmb") == "2"             # homologação
     assert _txt(inf, "tpEmit") == "1"            # prestador é o emitente
 

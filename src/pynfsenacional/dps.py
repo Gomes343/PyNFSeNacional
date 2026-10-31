@@ -31,7 +31,15 @@ from typing import Any
 from lxml import etree
 
 from . import documentos
-from .config import PTOTTRIB_CHAVES, ClienteConfig, percentual
+from .config import (
+    LEIAUTE_NT009,
+    LEIAUTE_PRODUCAO,
+    LEIAUTES,
+    PTOTTRIB_CHAVES,
+    ClienteConfig,
+    leiaute_do_ambiente,
+    percentual,
+)
 
 _log = logging.getLogger(__name__)
 
@@ -131,6 +139,7 @@ def montar_dps(
     cfg: ClienteConfig, *, numero: str, valor: Decimal | float | int | str, descricao: str,
     tomador: dict[str, Any] | None, ambiente: str, serie: str = "1",
     dh_emi: str | None = None, d_comp: str | None = None, ver_aplic: str | None = None,
+    leiaute: str | None = None,
 ) -> str:
     """Monta o XML da DPS (string, NÃO assinado) a partir da config + dados da emissão.
 
@@ -140,10 +149,15 @@ def montar_dps(
     `ambiente`: "homologacao" (tpAmb=2) | "producao" (tpAmb=1).
     `dh_emi`/`d_comp`/`ver_aplic`: injetáveis (default = relógio de Brasília / constante);
     o golden passa valores fixos para o byte-diff ser determinístico.
+    `leiaute`: pacote do XSD (§19) — None = `cfg.leiaute`, e vazio nela = o do ambiente.
     """
     from . import relogio  # import tardio: relogio é infra, evita ciclo conceitual
 
     p, s, r = cfg.prestador, cfg.servico, cfg.prestador.regime
+    leiaute = leiaute or cfg.leiaute or leiaute_do_ambiente(ambiente)
+    if leiaute not in LEIAUTES:
+        raise ValueError(f"leiaute inválido: {leiaute!r} (use {' ou '.join(LEIAUTES)}) — §19")
+    nt009 = leiaute == LEIAUTE_NT009
     idd = id_dps(cfg, numero, serie)
 
     dps = etree.Element(f"{{{NS}}}DPS", nsmap={None: NS})
@@ -158,6 +172,10 @@ def montar_dps(
     _el(inf, "nDPS", str(numero))
     _el(inf, "dCompet", d_comp or relogio.d_comp())
     _el(inf, "tpEmit", "1")                       # prestador é o emitente
+    if nt009:
+        # NT 009 (§19): a finalidade saiu do grupo IBSCBS e virou campo OBRIGATÓRIO de toda DPS,
+        # entre cMotivoEmisTI? e chNFSeRej? — com ou sem o grupo IBS/CBS.
+        _el(inf, "finNFSe", _fin_nfse(s.ibscbs))
     _el(inf, "cLocEmi", p.codigo_municipio)
 
     # Prestador (tpEmit=1): CNPJ + (IM) + regTrib — sem nome/endereço (E0128/E0121).
@@ -215,12 +233,17 @@ def montar_dps(
     _el(cserv, "cTribNac", s.cTribNac)
     if s.cTribMun:
         _el(cserv, "cTribMun", str(s.cTribMun))
-    _el(cserv, "xDescServ", descricao or s.descricao_padrao)
-    # Item da NBS (TCCServ: cTribNac → cTribMun? → xDescServ → cNBS? → cIntContrib?). Opcional:
+    # TCCServ: cTribNac → cTribMun? → xDescServ → cNBS? → cIntContrib? no leiaute de produção;
+    # na NT 009 (§19) o xDescServ passou para o FIM, depois do cNBS. O Item da NBS é opcional:
     # vazio omite — a DPS do Simples segue idêntica (§14).
+    desc = descricao or s.descricao_padrao
+    if not nt009:
+        _el(cserv, "xDescServ", desc)
     nbs = documentos.digitos(s.cNBS)
     if nbs:
         _el(cserv, "cNBS", nbs)
+    if nt009:
+        _el(cserv, "xDescServ", desc)
     # infoCompl (0-1) é o ÚLTIMO filho de <serv> no XSD (TCServ) — depois de locPrest/cServ e de
     # comExt/obra/atvEvento/explRod, que não emitimos. Texto livre, sem efeito fiscal: o SEFIN não
     # o interpreta e o DANFSe o imprime como "Inf. Cont.:". Vazio → o grupo inteiro é OMITIDO
@@ -270,7 +293,7 @@ def montar_dps(
     # Grupo IBS/CBS (§8): último filho do infDPS, depois de <valores>. Só a CLASSIFICAÇÃO da
     # operação — base, alíquotas e valores o SEFIN calcula. Sem `servico.ibscbs`, omitido.
     if s.ibscbs:
-        _montar_ibscbs(inf, s.ibscbs)
+        _montar_ibscbs(inf, s.ibscbs, leiaute)
 
     return str(etree.tostring(dps, encoding="unicode"))
 
@@ -284,22 +307,35 @@ def _dec2(valor: Any, nome: str) -> str:
     return f"{v:.2f}"
 
 
-def _montar_ibscbs(inf: etree._Element, ibs: dict[str, Any]) -> None:
-    """Grupo IBSCBS na ordem do XSD (TCRTCInfoIBSCBS): finNFSe → indFinal? → cIndOp → indDest
-    → valores/trib/gIBSCBS(CST → cClassTrib). Os opcionais não cobertos (tpOper, gRefNFSe,
-    tpEnteGov, dest, imovel, gReeRepRes, cCredPres, gTribRegular, gDif) o validar() recusa."""
+def _fin_nfse(ibs: dict[str, Any]) -> str:
+    """finNFSe: 0 = NFS-e regular. As notas de ajuste (1 crédito, 2 débito) o validar() recusa."""
+    return str((ibs or {}).get("finNFSe", "0")).strip() or "0"
+
+
+def _montar_ibscbs(
+    inf: etree._Element, ibs: dict[str, Any], leiaute: str = LEIAUTE_PRODUCAO,
+) -> None:
+    """Grupo IBSCBS na ordem do XSD (TCRTCInfoIBSCBS). Os opcionais não cobertos (tpOper,
+    gRefNFSe, tpEnteGov, dest, imovel, cCredPres, gTribRegular, gDif) o validar() recusa.
+
+    Leiaute de produção: finNFSe → indFinal? → cIndOp → indDest → valores/trib/gIBSCBS(CST →
+    cClassTrib). NT 009 (§19): o finNFSe sai daqui (vai para o infDPS) e o CST e o cClassTrib
+    sobem para valores/trib — o gIBSCBS fica só para crédito presumido, regular e diferimento."""
     def obrig(chave: str) -> str:
         v = str(ibs.get(chave) or "").strip()
         if not v:
             raise ValueError(f"servico.ibscbs.{chave} é obrigatório no grupo IBS/CBS")
         return v
 
+    nt009 = leiaute == LEIAUTE_NT009
     g = _el(inf, "IBSCBS")
-    _el(g, "finNFSe", str(ibs.get("finNFSe", "0")).strip())
+    if not nt009:
+        _el(g, "finNFSe", _fin_nfse(ibs))
     if ibs.get("indFinal") is not None and str(ibs["indFinal"]).strip():
         _el(g, "indFinal", str(ibs["indFinal"]).strip())
     _el(g, "cIndOp", obrig("cIndOp"))
     _el(g, "indDest", str(ibs.get("indDest", "0")).strip())
-    gi = _el(_el(_el(g, "valores"), "trib"), "gIBSCBS")
+    trib = _el(_el(g, "valores"), "trib")
+    gi = trib if nt009 else _el(trib, "gIBSCBS")
     _el(gi, "CST", obrig("CST"))
     _el(gi, "cClassTrib", obrig("cClassTrib"))

@@ -23,7 +23,7 @@ from lxml import etree
 
 from pynfsenacional import dps
 from pynfsenacional.assinatura import assinar_dps
-from pynfsenacional.config import ClienteConfig
+from pynfsenacional.config import LEIAUTE_PRODUCAO, ClienteConfig
 
 NSN = "http://www.sped.fazenda.gov.br/nfse"
 NSD = "http://www.w3.org/2000/09/xmldsig#"
@@ -66,7 +66,7 @@ def test_montar_dps_bate_gabarito_byte_a_byte(gabarito):
         cfg, numero=nota["numero"], serie=nota["serie"], valor=nota["valor"],
         descricao=nota["descricao"],
         tomador={"cpf_cnpj": nota["tomador"]["cpf_cnpj"], "nome": nota["tomador"]["xNome"]},
-        ambiente="homologacao",
+        ambiente="homologacao", leiaute=LEIAUTE_PRODUCAO,   # o leiaute que a referência PHP monta
         dh_emi=gabarito["dh_emi"], d_comp=gabarito["d_comp"], ver_aplic=gabarito["ver_aplic"],
     )
     inf = etree.fromstring(xml.encode()).find(f"{{{NSN}}}infDPS")
@@ -103,7 +103,7 @@ def test_assinatura_estrutura_digest_e_verifica(gabarito, tmp_path):
         cfg, numero=nota["numero"], serie=nota["serie"], valor=nota["valor"],
         descricao=nota["descricao"],
         tomador={"cpf_cnpj": nota["tomador"]["cpf_cnpj"], "nome": nota["tomador"]["xNome"]},
-        ambiente="homologacao",
+        ambiente="homologacao", leiaute=LEIAUTE_PRODUCAO,   # o leiaute que a referência PHP monta
         dh_emi=gabarito["dh_emi"], d_comp=gabarito["d_comp"], ver_aplic=gabarito["ver_aplic"],
     )
     assinado = assinar_dps(xml, cert_pfx_path=str(pfx), senha="0000")

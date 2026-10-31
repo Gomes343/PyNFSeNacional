@@ -202,8 +202,11 @@ Cada prestador é descrito por um **JSON puro**. Comece copiando o exemplo anota
     }
     // "cNBS": "120015000",             //   Item da NBS (9 díg) — Regime Regular (§14)
     // "ibscbs": {"cIndOp": "050101", "CST": "000", "cClassTrib": "000001", "indFinal": "0"}
-                                        //   grupo IBS/CBS — obrigatório no Regime Regular (§8)
+                                        //   grupo IBS/CBS — obrigatório no Regime Regular (§8);
+                                        //   exige o cNBS (E0322)
   }
+  // "leiaute": "20261020"              //   pacote do XSD (§19). Vazio = o do ambiente:
+                                        //   homologação 20261020 (NT 009), produção 20260209
 }
 ```
 
@@ -274,8 +277,11 @@ config (JSON)  →  montar DPS (XML)  →  assinar (XMLDSIG)  →  gzip+base64 �
 - ✅ **Regime Regular** (Não Optante — Lucro Presumido/Real): `pTotTrib`, `tpRetPisCofins`, Item da NBS
   e o **grupo IBS/CBS** (classificação: `cIndOp`, `CST`, `cClassTrib`) — v1.1.0
 - ✅ **ISS retido pelo tomador** (`tpRetISSQN=2`), com a recusa local de E0204/E0237 — v1.1.0
-- ⏳ Grupo IBS/CBS do **Simples Nacional** (obrigatório a partir de 01/01/2027, Ato Conjunto RFB/CGIBS
-  nº 4/2026) e os casos ainda não cobertos do grupo: destinatário ≠ adquirente, compra governamental
+- ✅ **Os dois leiautes do XSD** (produção 09/02/2026 e NT 009 de 20/10/2026, que a homologação já
+  aplica), escolhidos pelo ambiente; o grupo IBS/CBS do **Simples** autorizado em homologação
+- ⏳ Os campos do Simples da NT 009 (`regApIBSCBSSN`, `cAtvSN`) quando entrarem no esquema; o grupo
+  IBS/CBS do Simples é obrigatório a partir de 01/01/2027 (Ato Conjunto RFB/CGIBS nº 4/2026). E os
+  casos ainda não cobertos do grupo: destinatário ≠ adquirente, compra governamental
 - ⏳ Tomador estrangeiro / sem documento; `pAliq` (ISS retido de ME/EPP, município não conveniado)
 - ✅ **Cancelamento** (e101101 direto / e101103 análise fiscal), **consulta pela chave** e
   **distribuição DF-e** por NSU; valor em `Decimal`; certificado do servidor conferido — v1.2.0

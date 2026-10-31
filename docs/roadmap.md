@@ -24,9 +24,11 @@
 
 **Fora do v0.1 (próximas versões):**
 - IBS/CBS — o grupo `IBSCBS` é emitido quando a config o pede (`servico.ibscbs`, §8/§14): o
-  **Regime Regular** já o tem (obrigatório desde 01/10/2026). Falta o do **Simples**, obrigado a
-  partir de 01/01/2027 (Ato Conjunto RFB/CGIBS nº 4/2026), e os casos não cobertos do grupo
-  (destinatário ≠ adquirente, compra governamental, referência, imóvel, redução/diferimento).
+  **Regime Regular** já o tem (obrigatório desde 01/10/2026), e o do **Simples** (obrigado a partir
+  de 01/01/2027, Ato Conjunto RFB/CGIBS nº 4/2026) já foi autorizado em homologação no leiaute da
+  NT 009 (§19). Faltam os campos do Simples que a NT 009 cria e o esquema ainda não tem
+  (`regApIBSCBSSN`, `cAtvSN`), e os casos não cobertos do grupo (destinatário ≠ adquirente, compra
+  governamental, referência, imóvel, redução/diferimento).
 - Tomador estrangeiro / sem documento (consumidor final é só "omitir `<toma>`", esse entra fácil).
 - ~~Não-optantes (Lucro Presumido/Real)~~ — feito (§14): `pTotTrib`, `tpRetPisCofins`, `cNBS`,
   sem `regApTribSN` (E0162). E o ISS retido pelo tomador (§15). Falta o `pAliq` (§15).
@@ -55,6 +57,9 @@
    cancelamento (eventos e101101/e101103) e distribuição DF-e por NSU (ADN), validados ao vivo
    em homologação: consulta + DANFSe, cancelamento aceito, E0840 no segundo pedido, 22 notas da
    caixa postal.
+9. **Os dois leiautes do XSD** — produção (09/02/2026) e NT 009 (20/10/2026), escolhidos pelo
+   ambiente (§19). Os esquemas oficiais entram na suíte e validam toda variante da DPS. Validado ao
+   vivo em homologação: Simples sem o grupo e Simples **com** o grupo IBS/CBS autorizados.
 
 > **A estratégia do gabarito:** a referência PHP já assina/emite certo. Comparar a saída Python
 > contra ela byte a byte transforma o ponto mais arriscado (a canonicalização XMLDSIG) num exercício

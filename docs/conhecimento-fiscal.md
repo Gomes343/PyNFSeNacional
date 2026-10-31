@@ -37,9 +37,8 @@ Existem **duas APIs distintas**, sempre confundidas:
 
 > ⚠️ **Homologação à frente da produção (31/10/2026).** Neste dia a homologação passou a recusar
 > a DPS do leiaute atual com **E1235** — *"invalid child element 'cLocEmi' … expected
-> 'cMotivoEmisTI, finNFSe'"*: o esquema de lá já espera esses campos no `infDPS`, antes do
-> `cLocEmi`. A produção segue aceitando a DPS atual. É o aviso de que o leiaute vai mudar; até a
-> lib acompanhar, a emissão em homologação fica bloqueada (consulta, eventos e DF-e funcionam).
+> 'cMotivoEmisTI, finNFSe'"*: ela aplica o pacote de esquemas da **NT 009** (20/10/2026), e a
+> produção segue no de 09/02/2026. Os dois pacotes coexistem; a lib escolhe pelo ambiente — §19.
 
 > **`ambGer` ≠ ambiente.** `ambGer` (1=Prefeitura, 2=Sistema Nacional) — **toda** nota nacional tem
 > `ambGer=2`. O indicador Produção/Homologação é o **`tpAmb`** (1/2). Confundir os dois faz o DANFSe
@@ -330,6 +329,22 @@ documento, vale para **NF-e/NFC-e**, não para a NFS-e.
 
 Para o **Simples**, emite-se **sem** o grupo **até 31/12/2026** (sem `servico.ibscbs`, nada muda).
 Para o **Regime Regular**, configure o grupo (§14) — ele já é obrigatório.
+
+**Medido em homologação (31/10/2026, leiaute da NT 009):** um ME/EPP (psicologia, Rio de Janeiro)
+emitiu com o grupo — `cIndOp 030101`, `CST 000`, `cClassTrib 000001`, `indFinal 1` — e o SEFIN
+autorizou (cStat 100), devolvendo `vBC` igual ao serviço (o Simples não destaca ISS), IBS UF
+0,10%, IBS municipal 0% e CBS 0,90%: as mesmas alíquotas de teste do Regime Regular. A NFS-e
+ainda não traz o grupo `gTribSN` da NT 009 (ver §19).
+
+**E0322 — o grupo exige o Item da NBS.** Sem `cNBS`, o SEFIN recusa **qualquer** DPS com IBS/CBS,
+de qualquer regime (*"É obrigatório informar na DPS um item da NBS se for declarada qualquer
+informação de IBS/CBS"*). O `validar()` recusa a config antes.
+
+**De onde tirar os códigos:** o **Anexo VIII** (tabela de correlação, gov.br/nfse › documentação
+técnica › RTC) liga cada item da LC 116 ao NBS, ao `cIndOp` e ao `cClassTrib` — psicologia (04.16):
+NBS 1.2301.98.00, `cIndOp` 030101 (prestado no estabelecimento do fornecedor). O `cClassTrib`
+vem **em branco** para vários itens, entre eles os de profissão regulamentada, que podem ter
+redução de alíquota: é a decisão que a contabilidade tem de tomar, não a lib.
 
 Ainda **não cobertos** (o validador recusa a config em vez de emitir pela metade): destinatário
 diferente do adquirente (`indDest=1` → grupo `<dest>`), compra governamental (`tpEnteGov`), nota
@@ -652,4 +667,44 @@ CNPJ: as notas que ele **emitiu**, as que **recebeu** como tomador e os **evento
   baixar caixas de centenas de notas.
 - **Emitida × recebida:** o XML não diz de que lado o CNPJ está — compare o CNPJ do `<prest>` da
   DPS (sem ele, o do `<emit>`) com o do certificado.
+
+## 19. ★ Os dois leiautes do XSD: produção (09/02/2026) × NT 009 (20/10/2026)
+
+Os dois pacotes oficiais de esquemas têm a **mesma** `versao="1.01"` — o atributo não diz qual
+vale. Quem diz é o **ambiente**: a produção aplica o pacote de 09/02/2026 (`nfse-esquemas_xsd-v1-01-
+20260209.zip`); a produção restrita (homologação) aplica, desde 31/10/2026, o de 20/10/2026
+(`esquemas_prod_restrita_20261020.zip`, que implementa parte da **NT 009**). Uma DPS que passa num
+é **E1235** no outro.
+
+A lib escolhe pelo ambiente — homologação no `20261020`, produção no `20260209` — e a config pode
+forçar (`"leiaute": "20261020"`). Forçar serve para **a virada**: quando a produção trocar de
+pacote antes de a lib trocar o padrão. Nesse dia o SEFIN devolve E1235 citando o `finNFSe`, e a lib
+acrescenta à mensagem qual leiaute configurar.
+
+O que muda na DPS que esta lib monta (o resto do pacote não toca nela):
+
+| | produção (20260209) | NT 009 (20261020) |
+|---|---|---|
+| `finNFSe` | dentro do `IBSCBS`, só quando há o grupo | no `infDPS`, entre `cMotivoEmisTI` e `chNFSeRej` — **obrigatório em toda DPS** |
+| `xDescServ` | depois do `cTribMun` | o último do `cServ`, depois do `cNBS`/`cIntContrib` |
+| `CST` + `cClassTrib` | em `IBSCBS/valores/trib/gIBSCBS` | em `IBSCBS/valores/trib`; o `gIBSCBS` fica só para crédito presumido, tributação regular e diferimento |
+| `cIndOp` | obrigatório no grupo | opcional no esquema (a lib segue exigindo; o Anexo VIII o dá por item) |
+| CNPJ | `[0-9]{14}` | alfanumérico `[0-9A-Z]{14}` |
+
+O resto da NT 009 que o pacote de 20/10 **ainda não tem** (conferido no XSD): `regApIBSCBSSN` e
+`cAtvSN` (regime de apuração do IBS/CBS e atividade do Simples), `opSimpNac=4` (optante pendente),
+`gIBSCBSAjuste` e os tipos das notas de ajuste, `indDest` no `infDPS`, e na NFS-e o `gTribSN` e o
+`vReceitaBrutaSN`. Quando chegarem num pacote novo, entram aqui antes do código.
+
+**Eventos e DF-e não mudaram** entre os pacotes (`pedRegEvento`, `evento`, `tiposEventos` iguais):
+o cancelamento da §16 vale nos dois.
+
+> **Defeito no esquema de PRODUÇÃO:** o padrão da série (`TSSerieDPS`) vem como
+> `^0{0,4}\d{1,5}$`. Em XSD, `^` e `$` são caracteres literais, então num validador estrito
+> (libxml2/lxml) **nenhuma** série passa — o SEFIN aceita, logo trata os dois como âncoras. Quem
+> valida a DPS localmente contra esse pacote precisa tirar os dois caracteres; o pacote da NT 009
+> já corrigiu. Os esquemas que a suíte usa estão em `tests/xsd/` (com esse único ajuste anotado).
+
+**Validado ao vivo em homologação (31/10/2026)**, ME/EPP do Rio de Janeiro: a DPS sem o grupo
+IBS/CBS autorizada no leiaute novo (o E1235 sumiu), e com o grupo também (§8). As duas canceladas.
 

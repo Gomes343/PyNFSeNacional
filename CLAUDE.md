@@ -107,8 +107,13 @@ ponta a ponta: **validar → montar DPS → assinar → transporte mTLS → Nota
   e `Emissor.sincronizar_dfe` (`dfe.py`, caixa postal do ADN por NSU). Validados ao vivo em
   homologação. O contador de nDPS deixou de travar no `ja_emitida` (compara valor + tomador da
   nota achada) e o valor passou a `Decimal`. Regra em `docs/conhecimento-fiscal.md` §5, §16–§18.
-  ⚠️ Em 31/10/2026 a homologação passou a recusar a DPS atual (E1235, espera `finNFSe`/
-  `cMotivoEmisTI` antes do `cLocEmi`) — §1; a produção segue aceitando.
+- **Os dois leiautes do XSD (31/10/2026, ainda não publicado):** a homologação aplica o pacote da
+  NT 009 (20/10/2026) e a produção o de 09/02/2026 — mesma `versao="1.01"`. `montar_dps` escolhe
+  pelo ambiente (`config.leiaute_do_ambiente`; a config força com `"leiaute"`), e a DPS de produção
+  saiu idêntica byte a byte (hashes pinados + golden com `leiaute=LEIAUTE_PRODUCAO`, que é o que a
+  referência PHP monta). Os XSDs oficiais estão em `tests/xsd/` e `tests/test_leiaute.py` valida
+  toda variante contra o do seu leiaute. Validado ao vivo em homologação, inclusive o Simples COM o
+  grupo IBS/CBS. Regra em `docs/conhecimento-fiscal.md` §19 (e §8: E0322, Anexo VIII).
 - `danfse.py` — DANFSe local via `BrazilFiscalReport` ≥ 1.0 (validado com XML de NFS-e real). ✅
 - `cli.py` — `nfse-nacional emitir` (`--pdf`/`--xml-out`/`--verbose`); logging com redação. ✅
 
@@ -123,12 +128,13 @@ pyproject deles parece engano) só entra para gerar o PDF. Import lazy em `danfs
 **Publicado:** repo em github.com/Gomes343/PyNFSeNacional e pacote no PyPI (`PyNFSeNacionalGT`) —
 release por tag `vX.Y.Z` (PyPI via Trusted Publishing + Release do GitHub, sem token no repo).
 **Em aberto:** (1) endurecimento a partir de mais emissões reais; (2) grupo IBS/CBS do **Simples**
-(01/01/2027) e os casos não cobertos do grupo; `pAliq`; (3) reportar o classifier de licença errado
-upstream; (4) o leiaute novo que a homologação já exige (§1); (5) evento de substituição.
+(01/01/2027): faltam `regApIBSCBSSN`/`cAtvSN` da NT 009, que o esquema ainda não tem, e os casos não
+cobertos do grupo; `pAliq`; (3) reportar o classifier de licença errado upstream; (4) trocar o
+leiaute padrão da produção quando ela virar para o pacote da NT 009; (5) evento de substituição.
 
 Tooling: `pip install -e ".[dev]"` (deps instalam no 3.10–3.14), lock com hashes
 (`requirements-dev.txt`), CI (`.github/workflows/ci.yml`), release por tag (`release.yml`).
-Testes: `pytest` (206 passed, +2 skip locais), `ruff check .`, `mypy --strict` — tudo verde.
+Testes: `pytest` (272 passed, +2 skip locais), `ruff check .`, `mypy --strict` — tudo verde.
 
 ## Regras
 

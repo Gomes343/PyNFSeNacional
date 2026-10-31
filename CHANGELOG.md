@@ -5,6 +5,23 @@ versionamento [SemVer](https://semver.org/lang/pt-BR/).
 
 ## [Não publicado]
 
+### Adicionado
+- **O leiaute da NT 009** (pacote de esquemas de 20/10/2026), que a homologação aplica desde
+  31/10/2026 e recusava a DPS da lib com E1235. A lib monta os dois e escolhe pelo ambiente:
+  homologação no `20261020`, produção no `20260209` (a DPS de produção não mudou um byte). A
+  config pode forçar com `"leiaute"`, para a virada da produção. No novo: `finNFSe` no `infDPS`
+  (em toda DPS), `xDescServ` depois do `cNBS`, e `CST`/`cClassTrib` direto em `IBSCBS/valores/trib`.
+  Validado ao vivo em homologação (§19).
+- O E1235 que cita o `finNFSe` ganha, no fim da mensagem, qual leiaute configurar — é o sinal de
+  que a produção virou de pacote antes da lib. O `[E1235]` segue no começo.
+- `validar()` recusa o grupo IBS/CBS sem o Item da NBS (**E0322**), medido em homologação.
+- Os esquemas oficiais dos dois pacotes em `tests/xsd/`: toda DPS que a suíte monta (8 configs × 3
+  tomadores × 2 leiautes) é validada contra o XSD do seu leiaute.
+
+### Documentação
+- §19 (os dois leiautes) e, na §8, o grupo IBS/CBS do **Simples** autorizado em homologação, o
+  E0322 e o Anexo VIII (de onde tirar NBS, `cIndOp` e `cClassTrib` por item).
+
 ## [1.2.0] - 2026-10-31
 
 ### Corrigido
