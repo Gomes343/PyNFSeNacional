@@ -34,6 +34,8 @@ costuramos e escrevemos só o que falta (transporte ao SEFIN + acabamento). Mapa
 | Assinar XMLDSIG | `erpbrasil.assinatura` | `assinatura.py` |
 | Ler `.pfx` A1 | `cryptography` | `certificado.py` |
 | Transporte mTLS SEFIN | `requests` + próprio | `sefin.py` |
+| Cancelamento (eventos) | `lxml` + `assinatura.py` | `eventos.py` |
+| Distribuição DF-e (ADN) | `requests` + próprio | `dfe.py` |
 | DANFSe (PDF) | `BrazilFiscalReport` | `danfse.py` |
 | Orquestração + CLI | — | `emissor.py`, `cli.py` |
 
@@ -98,6 +100,15 @@ ponta a ponta: **validar → montar DPS → assinar → transporte mTLS → Nota
 - `assinatura.py` — `assinar_dps` via `erpbrasil.assinatura`; mesmo `DigestValue` do gabarito. ✅
 - `sefin.py` — transporte mTLS (`requests-pkcs12`, P12 direto), `POST /nfse`, `verificarDps`.
   **mTLS validado ao vivo** em homologação (handshake + `HEAD /dps`, read-only). ✅
+  Desde a 1.2.0 confere o certificado do SERVIDOR (cadeia pública; os endpoints de município
+  ficam sem conferência por padrão), devolve TODOS os erros e explica o HTTP sem E-code.
+- **1.2.0 (31/10/2026) — ciclo de vida da nota:** `Emissor.consultar` (`GET /nfse/{chave}`),
+  `Emissor.cancelar` (`eventos.py`, e101101/e101103 — o pedido é byte a byte o da referência PHP)
+  e `Emissor.sincronizar_dfe` (`dfe.py`, caixa postal do ADN por NSU). Validados ao vivo em
+  homologação. O contador de nDPS deixou de travar no `ja_emitida` (compara valor + tomador da
+  nota achada) e o valor passou a `Decimal`. Regra em `docs/conhecimento-fiscal.md` §5, §16–§18.
+  ⚠️ Em 31/10/2026 a homologação passou a recusar a DPS atual (E1235, espera `finNFSe`/
+  `cMotivoEmisTI` antes do `cLocEmi`) — §1; a produção segue aceitando.
 - `danfse.py` — DANFSe local via `BrazilFiscalReport` ≥ 1.0 (validado com XML de NFS-e real). ✅
 - `cli.py` — `nfse-nacional emitir` (`--pdf`/`--xml-out`/`--verbose`); logging com redação. ✅
 
@@ -113,11 +124,11 @@ pyproject deles parece engano) só entra para gerar o PDF. Import lazy em `danfs
 release por tag `vX.Y.Z` (PyPI via Trusted Publishing + Release do GitHub, sem token no repo).
 **Em aberto:** (1) endurecimento a partir de mais emissões reais; (2) grupo IBS/CBS do **Simples**
 (01/01/2027) e os casos não cobertos do grupo; `pAliq`; (3) reportar o classifier de licença errado
-upstream.
+upstream; (4) o leiaute novo que a homologação já exige (§1); (5) evento de substituição.
 
 Tooling: `pip install -e ".[dev]"` (deps instalam no 3.10–3.14), lock com hashes
 (`requirements-dev.txt`), CI (`.github/workflows/ci.yml`), release por tag (`release.yml`).
-Testes: `pytest` (138 passed, +2 skip locais), `ruff check .`, `mypy --strict` — tudo verde.
+Testes: `pytest` (206 passed, +2 skip locais), `ruff check .`, `mypy --strict` — tudo verde.
 
 ## Regras
 

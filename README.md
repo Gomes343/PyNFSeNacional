@@ -18,7 +18,7 @@ robô de navegador nem da API de PDF do governo.
 
 </div>
 
-> ✅ **Lançado — v1.0.** Em **produção real desde junho de 2026**: é o motor que emite as NFS-e de um
+> ✅ **Lançado — v1.x.** Em **produção real desde junho de 2026**: é o motor que emite as NFS-e de um
 > escritório de contabilidade, mês após mês, para prestadores de vários municípios — **centenas de
 > notas autorizadas** pelo SEFIN Nacional. O pipeline completo (`config → certificado → DPS →
 > assinatura → transporte mTLS → DANFSe`) é validado **byte a byte** contra uma implementação de
@@ -51,7 +51,14 @@ adicionando o que faltava (o transporte ao SEFIN nacional + o acabamento).
 - 🖨️ **DANFSe gerado localmente** (PDF), antecipando o fim da API de PDF do governo.
 - 🔐 **Assinatura XMLDSIG** por biblioteca madura (`erpbrasil.assinatura`), validada byte a byte.
 - ✅ **Validação fiscal antes de enviar** — pega E0312/E0712/E1235… e CPF/CNPJ (mód-11) localmente.
-- 🔁 **Idempotência nativa** (`verificarDps`) — não duplica nota num reenvio.
+- 🔁 **Idempotência nativa** (`verificarDps`) — não duplica nota num reenvio, e a nota recuperada
+  volta com o XML (dá para gerar o DANFSe).
+- ❌ **Cancelamento** direto (e101101) ou por análise fiscal (e101103), para os municípios que não
+  aceitam o direto.
+- 🔎 **Consulta pela chave** e 📬 **caixa postal DF-e**: as notas emitidas, as recebidas como
+  tomador e os eventos do CNPJ, por NSU.
+- 💰 Valor em **`Decimal`** (também aceita `"1.262,90"`), sem erro de arredondamento binário.
+- 🔒 Certificado do servidor **conferido** (mTLS nos dois sentidos).
 - 🧩 **Núcleo enxuto e MIT-limpo**; a geração de PDF é uma dependência **opcional**.
 - 🐍 Tipado (`mypy --strict`), testado (incl. *golden* contra a referência) e com CLI turnkey.
 
@@ -69,9 +76,9 @@ pip install "PyNFSeNacionalGT[danfse]"
 
 > Requer **Python 3.10+**. No PyPI o pacote se chama **`PyNFSeNacionalGT`** (o nome `PyNFSeNacional`
 > esbarra na proteção do PyPI por semelhança com outro projeto); o **import continua `pynfsenacional`**.
-> Pin recomendado: **`PyNFSeNacionalGT>=0.5.0`** — a v0.1.0 tem o bug de ordem da `<IM>` (corrigido
-> na 0.2.0), a 0.3.0 traz o leiaute RTC 1.01, a 0.4.0 o MEI e o CNPJ alfanumérico, e a 0.5.0 a
-> Inscrição Municipal opcional de verdade (§10 do conhecimento fiscal).
+> Pin recomendado: **`PyNFSeNacionalGT>=1.2.0`** — a 1.2.0 corrige o contador de nDPS que travava
+> depois de uma resposta perdida (toda emissão seguinte voltava "já emitida") e traz cancelamento,
+> consulta pela chave e a caixa postal DF-e. O histórico de cada versão está no [CHANGELOG](CHANGELOG.md).
 
 ---
 
@@ -80,18 +87,35 @@ pip install "PyNFSeNacionalGT[danfse]"
 ### Em Python
 
 ```python
+from decimal import Decimal
 from pynfsenacional import Emissor
 
 emissor = Emissor("config/cliente.json")          # certificado A1 + dados do prestador
 
 nota = emissor.emitir(                              # monta DPS → assina → envia ao SEFIN
-    valor=150.00,
+    valor=Decimal("150.00"),                        # também aceita "150,00", 150 ou 150.0
     descricao="Sessão de psicoterapia",
     tomador={"cpf_cnpj": "00000000000", "nome": "Fulano de Tal"},
 )
 
 print(nota.emitida, nota.numero_nfse, nota.chave_acesso)
 nota.danfse("nota.pdf")                             # gera o PDF do DANFSe localmente
+```
+
+Depois da emissão:
+
+```python
+nota = emissor.consultar(chave)                     # a NFS-e (e o XML) pela chave; None se não existe
+
+r = emissor.cancelar(chave, justificativa="Erro na emissão da nota fiscal", motivo=1)
+# motivo: 1=Erro na Emissão · 2=Serviço não Prestado · 9=Outros
+# município que não aceita o cancelamento direto (E0823): modo="analise"
+print(r.ok, r.cancelada, r.erro_msg)
+
+caixa = emissor.sincronizar_dfe(nsu=0)              # emitidas, recebidas e eventos do CNPJ
+for doc in caixa.documentos:
+    print(doc.nsu, doc.classificar(emissor.cfg.prestador.cnpj), doc.chave_acesso)
+proximo_nsu = caixa.ultimo_nsu                      # guarde: a próxima leitura parte daqui
 ```
 
 ### Pela linha de comando
@@ -102,6 +126,12 @@ nfse-nacional emitir config/cliente.json \
     --tomador-doc 00000000000 --tomador-nome "Fulano de Tal" \
     --ambiente homologacao \
     --pdf nota.pdf
+```
+
+```bash
+nfse-nacional consultar config/cliente.json <chave> --pdf nota.pdf
+nfse-nacional cancelar  config/cliente.json <chave> --justificativa "Erro na emissão da nota fiscal"
+nfse-nacional dfe       config/cliente.json --nsu 0 --destino xmls/
 ```
 
 | Saída | Significado |
@@ -115,7 +145,9 @@ nfse-nacional emitir config/cliente.json \
 
 > **Operação:** o `nDPS` é um contador **interno** por prestador+ambiente, persistido em
 > `out/numero_<id>_<ambiente>.txt` — quem atribui o `nNFSe` é o SEFIN. Reenviar a mesma DPS é
-> **idempotente** (`verificarDps`): não duplica. Para acompanhar o passo a passo, rode
+> **idempotente** (`verificarDps`): não duplica. Se a DPS daquele número já existe, a lib busca a
+> nota e compara valor e tomador: é a mesma → devolve `ja_emitida` com o XML; é outra (contador
+> atrasado) → pula o número. Quem passa `numero=` explícito controla a numeração. Para acompanhar o passo a passo, rode
 > `nfse-nacional -v emitir …` (o `-v` vem **antes** do subcomando).
 
 ---
@@ -245,7 +277,9 @@ config (JSON)  →  montar DPS (XML)  →  assinar (XMLDSIG)  →  gzip+base64 �
 - ⏳ Grupo IBS/CBS do **Simples Nacional** (obrigatório a partir de 01/01/2027, Ato Conjunto RFB/CGIBS
   nº 4/2026) e os casos ainda não cobertos do grupo: destinatário ≠ adquirente, compra governamental
 - ⏳ Tomador estrangeiro / sem documento; `pAliq` (ISS retido de ME/EPP, município não conveniado)
-- ⏳ Eventos (cancelamento e substituição)
+- ✅ **Cancelamento** (e101101 direto / e101103 análise fiscal), **consulta pela chave** e
+  **distribuição DF-e** por NSU; valor em `Decimal`; certificado do servidor conferido — v1.2.0
+- ⏳ Evento de **substituição** (e105102) e manifestação do tomador
 - ⏳ DANFSe: exibir o **total aproximado de tributos** do Simples (`pTotTribSN`, Lei 12.741) — hoje sai como "—" (o `BrazilFiscalReport` não lê esse campo)
 
 Detalhes em [`docs/roadmap.md`](docs/roadmap.md) e [`CHANGELOG.md`](CHANGELOG.md).

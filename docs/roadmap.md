@@ -30,7 +30,8 @@
 - Tomador estrangeiro / sem documento (consumidor final é só "omitir `<toma>`", esse entra fácil).
 - ~~Não-optantes (Lucro Presumido/Real)~~ — feito (§14): `pTotTrib`, `tpRetPisCofins`, `cNBS`,
   sem `regApTribSN` (E0162). E o ISS retido pelo tomador (§15). Falta o `pAliq` (§15).
-- Eventos (cancelamento, substituição).
+- ~~Eventos de cancelamento~~ — feito na 1.2.0 (§16): direto (e101101) e análise fiscal (e101103).
+  Falta a **substituição** (e105102) e as manifestações do tomador.
 - Auto-resolver razão social de CNPJ via BrasilAPI (conveniência).
 
 ## Fases de build (ordem por risco crescente)
@@ -42,7 +43,7 @@
    byte-a-byte** com o gabarito da referência PHP (`tests/golden/`).
 4. **Assinar** ✅ — `erpbrasil.assinatura` (signxml): mesmo `DigestValue` do gabarito (RSA-SHA1),
    `Reference=#Id`, assinatura **verifica**. Desrisco offline do ponto-chave, **sem o SEFIN**.
-5. **Transporte mTLS** ✅ — `sefin.SefinClient` (`requests-pkcs12`, P12 direto, `verify=False`,
+5. **Transporte mTLS** ✅ — `sefin.SefinClient` (`requests-pkcs12`, P12 direto, servidor conferido desde a 1.2.0,
    gzip+base64, `POST /nfse`, `verificarDps`). **EMISSÃO REAL validada em homologação** (com um
    certificado A1 real, Simples Nacional/RJ): o SEFIN devolveu o `nNFSe` + chave de 50 díg; DANFSe
    gerado. No caminho, corrigido o **E1229** (faltava o prolog `<?xml encoding="UTF-8"?>` no XML assinado).
@@ -50,6 +51,10 @@
    NFS-e **real** (PDF gerado). Os 2 gotchas do §6 já vêm corrigidos upstream.
 7. **CLI + empacotar** ✅ — `nfse-nacional emitir` (`--pdf`/`--xml-out`/`--verbose`); logging com
    redação; CHANGELOG; build (wheel/sdist) e workflow de release (PyPI Trusted Publishing por tag).
+8. **Ciclo de vida da nota** ✅ (1.2.0) — consulta pela chave (`GET /nfse/{chave}`),
+   cancelamento (eventos e101101/e101103) e distribuição DF-e por NSU (ADN), validados ao vivo
+   em homologação: consulta + DANFSe, cancelamento aceito, E0840 no segundo pedido, 22 notas da
+   caixa postal.
 
 > **A estratégia do gabarito:** a referência PHP já assina/emite certo. Comparar a saída Python
 > contra ela byte a byte transforma o ponto mais arriscado (a canonicalização XMLDSIG) num exercício

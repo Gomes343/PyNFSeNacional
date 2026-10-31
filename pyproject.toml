@@ -4,20 +4,28 @@ build-backend = "hatchling.build"
 
 [project]
 name = "PyNFSeNacionalGT"
-version = "1.1.0"
-description = "Emissão de NFS-e pela API SEFIN Nacional (DPS) + geração local do DANFSe, em Python puro."
+version = "1.2.0"
+description = "Emissão, consulta e cancelamento de NFS-e pela API SEFIN Nacional (DPS), caixa postal DF-e e DANFSe local, em Python."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { file = "LICENSE" }
 authors = [{ name = "Murilo Gomes Teixeira" }]
-keywords = ["nfse", "nfse-nacional", "sefin", "dps", "danfse", "nota-fiscal", "fiscal", "brasil"]
+keywords = ["nfse", "nfse-nacional", "sefin", "dps", "danfse", "nota-fiscal", "fiscal", "brasil", "dfe", "adn", "cancelamento"]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Natural Language :: Portuguese (Brazilian)",
+    "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Office/Business :: Financial :: Accounting",
+    "Typing :: Typed",
 ]
 
 # Dependências — a estratégia é INTEGRAR libs maduras do ecossistema fiscal Python,
@@ -44,6 +52,8 @@ dev = ["pytest>=8", "ruff", "mypy", "build", "hypothesis", "brazilfiscalreport[d
 
 [project.urls]
 Homepage = "https://github.com/Gomes343/PyNFSeNacional"
+Documentation = "https://github.com/Gomes343/PyNFSeNacional/blob/main/docs/conhecimento-fiscal.md"
+Changelog = "https://github.com/Gomes343/PyNFSeNacional/blob/main/CHANGELOG.md"
 Issues = "https://github.com/Gomes343/PyNFSeNacional/issues"
 
 [project.scripts]

@@ -5,6 +5,50 @@ versionamento [SemVer](https://semver.org/lang/pt-BR/).
 
 ## [Não publicado]
 
+## [1.2.0] - 2026-10-31
+
+### Corrigido
+- **O contador de nDPS travava depois de uma resposta perdida.** Se o envio saía e a resposta não
+  voltava (timeout), o contador não avançava; na emissão seguinte o `verificarDps` achava a DPS
+  antiga e devolvia `ja_emitida` — também sem avançar. Dali em diante TODA nota nova voltava "já
+  emitida" com a chave da antiga, e nenhuma saía. Agora o contador avança, e a lib confere se a
+  DPS achada é a mesma nota (valor + documento do tomador): é → `ja_emitida`; é outra (contador
+  atrasado) → pula o número e emite; sem como conferir → `ja_emitida` (o ambíguo conta como feito).
+  Quem passa `numero=` explícito não é afetado.
+- O contador nunca recua (`_commit_numero` grava o maior entre o atual e o usado + 1).
+
+### Adicionado
+- **Cancelamento**: `Emissor.cancelar(chave, justificativa=…, motivo=1, modo="direto"|"analise")` —
+  e101101 (direto) e e101103 (análise fiscal, para o município que recusa o direto com E0823).
+  Valida motivo (1/2/9) e justificativa (15–200) antes de assinar. O pedido sai idêntico, byte a
+  byte, ao da implementação de referência em produção; validado em homologação (§16).
+- **Consulta pela chave**: `Emissor.consultar(chave)` → `Nota` com o XML (DANFSe), ou `None`.
+- **Distribuição DF-e**: `Emissor.sincronizar_dfe(nsu)` → `RespostaDfe` com as NFS-e emitidas,
+  recebidas e os eventos do CNPJ, por NSU, com pausa entre páginas e nova tentativa no HTTP 429
+  (§18). `DocumentoDfe.classificar(cnpj)` diz "emitida", "recebida" ou "evento".
+- CLI: `nfse-nacional consultar`, `cancelar` e `dfe`.
+- A nota recuperada (`ja_emitida`) volta com o **XML** (antes, só a chave — sem DANFSe) e com o
+  `nNFSe`, tirado da chave quando o XML não vem (`pynfsenacional.chave`).
+- `Nota.erros` e `RespostaSefin.erros`: **todos** os erros da resposta (antes só o primeiro chegava).
+  O `erro_msg` continua começando por `[E0xxx]` e traz os demais depois de ` | `.
+- Falha HTTP sem E-code vem explicada: `"resposta não-JSON (HTTP 503) — SEFIN fora do ar (serviço
+  indisponível)"`; 401/403 apontam o certificado, 429 pede para esperar. O `HTTP NNN` segue no texto.
+  `RespostaSefin.http_status` guarda o status.
+- `py.typed`: a tipagem (`mypy --strict`) chega a quem instala o pacote.
+
+### Mudado
+- **O certificado do servidor da SEFIN é conferido** (`verify` ligado). A cadeia é pública
+  (GlobalSign/SERPRO; o ADN usa Let's Encrypt), medido nos dois ambientes. Os endpoints próprios
+  de município (Catanduva) seguem sem conferência por padrão. `SefinClient(verificar_servidor=…)`
+  aceita `True`, `False` ou o caminho de um CA bundle.
+- **Valor em `Decimal`.** `emitir(valor=…)` aceita `Decimal`, `int`, `str` (`"1.262,90"` ou
+  `"1262.90"`) e `float` (convertido via `str`, sem o erro binário), com arredondamento comercial.
+  Valor zero, negativo ou ilegível é recusado com `ConfigError` antes de tocar a rede.
+
+### Aviso
+- Em 31/10/2026 a **homologação** passou a recusar a DPS do leiaute atual (E1235: espera
+  `cMotivoEmisTI`/`finNFSe` antes do `cLocEmi`). A produção segue aceitando. Ver §1.
+
 ## [1.1.0] - 2026-10-26
 
 ### Adicionado

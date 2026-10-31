@@ -29,6 +29,18 @@ Existem **duas APIs distintas**, sempre confundidas:
 | 🧪 Homologação (teste) | `sefin.producaorestrita.nfse.gov.br` | 2 | sem validade jurídica |
 | 🟢 Produção (nota real) | `sefin.nfse.gov.br` | 1 | nota real |
 
+> **O certificado do SERVIDOR é conferido.** Os dois endpoints da SEFIN usam cadeia pública
+> (GlobalSign, emitida pelo SERPRO; o ADN usa Let's Encrypt) — medido em 31/10/2026. A lib confere
+> por padrão desde a 1.2.0 (antes ia com `verify=False`, herdado da referência PHP). Só os
+> endpoints próprios de município ficam sem conferência por padrão: o de Catanduva é um IP cru.
+> Se a cadeia mudar um dia, `SefinClient(verificar_servidor="caminho/do/ca-bundle.pem")`.
+
+> ⚠️ **Homologação à frente da produção (31/10/2026).** Neste dia a homologação passou a recusar
+> a DPS do leiaute atual com **E1235** — *"invalid child element 'cLocEmi' … expected
+> 'cMotivoEmisTI, finNFSe'"*: o esquema de lá já espera esses campos no `infDPS`, antes do
+> `cLocEmi`. A produção segue aceitando a DPS atual. É o aviso de que o leiaute vai mudar; até a
+> lib acompanhar, a emissão em homologação fica bloqueada (consulta, eventos e DF-e funcionam).
+
 > **`ambGer` ≠ ambiente.** `ambGer` (1=Prefeitura, 2=Sistema Nacional) — **toda** nota nacional tem
 > `ambGer=2`. O indicador Produção/Homologação é o **`tpAmb`** (1/2). Confundir os dois faz o DANFSe
 > rotular nota de produção como "SEM VALIDADE JURÍDICA" (ver §6).
@@ -201,6 +213,13 @@ município + código + data) para descobrir/confirmar o `cTribMun` — confirmar
   um **contador interno** — pode auto-incrementar livremente, sem relação com o número fiscal.
 - Implementação: **contador por ambiente** (`numero_<id>_<homologacao|producao>.txt`), incrementa só
   quando a nota foi de fato emitida. Testes em homologação **não** consomem a numeração de produção.
+- **A DPS já existe na SEFIN** (o `HEAD /dps/{id}` volta 200): ou é a MESMA nota, que saiu e a
+  resposta se perdeu, ou o contador está atrasado e o número é de OUTRA nota. A lib busca o XML
+  pela chave e compara **valor + documento do tomador** (a descrição fica fora — reescrevê-la num
+  reenvio não faz dela outra nota). Mesma nota → `ja_emitida` com o XML; outra nota → pula o
+  número; sem XML para conferir → `ja_emitida` (o ambíguo conta como feito). O contador avança
+  nos três casos. Até a 1.1.0 ele não avançava, e toda emissão seguinte caía na mesma DPS.
+  Quem passa o `numero=` explícito controla a numeração: a lib só recupera a nota.
 
 ### ★ Quando o prestador JÁ emitia por outro sistema — use uma série dedicada
 
@@ -572,3 +591,65 @@ Medido em homologação (Regime Regular, serviço de R$ 100,00, ISS 3%, mesma DP
 97,00 — o valor que o prestador recebe; sem ela, `vTotalRet` some e `vLiq` = 100,00. A base do
 IBS/CBS foi 97,00 **nos dois casos** (o serviço menos o ISSQN, retido ou não — §8). O DANFSe
 imprime "Retenção do ISSQN: Retido pelo Tomador".
+
+---
+
+## 16. ★ Cancelamento — direto (e101101) × análise fiscal (e101103)
+
+O cancelamento é um **evento**: um `pedRegEvento` assinado no `infPedReg` (mesmo perfil da DPS:
+RSA-SHA1, `<Signature>` depois do nó assinado) e enviado em `gzip+base64` no campo
+`pedidoRegistroEventoXmlGZipB64` de `POST /nfse/{chave}/eventos`.
+
+| Modo | Evento | Quando | Efeito |
+|---|---|---|---|
+| `direto` | e101101 | o município aceita o cancelamento pelo contribuinte | nota cancelada na hora |
+| `analise` | e101103 | o município **não** aceita o direto (ele volta **E0823**) | nota "em análise" até o fisco municipal deferir |
+
+O que muda de um município para outro é só o modo — e não há como saber antes de tentar: o
+direto recusado com E0823 diz que ali é análise. Mesmo pelo portal web é assim.
+
+**A estrutura** (validada em homologação e idêntica, byte a byte, à da implementação de referência
+que cancela em produção): `Id = "PRE" + chave + tipo do evento`; `tpAmb` → `verAplic` →
+`dhEvento` → `CNPJAutor` (ou `CPFAutor`) → `chNFSe` → `e1011xx { xDesc, cMotivo, xMotivo }`.
+
+- ☠️ **`xDesc` é enumeração e a SEFIN exige o texto ACENTUADO.** O XSD publicado (v1.01) lista
+  `Solicitacao de Analise Fiscal…` sem acento; enviado assim volta **E1235**. Aceito:
+  `Cancelamento de NFS-e` e `Solicitação de Análise Fiscal para Cancelamento de NFS-e`.
+- `cMotivo`: **1** Erro na Emissão · **2** Serviço não Prestado · **9** Outros.
+- `xMotivo` (justificativa): **15 a 200 caracteres**.
+- `dhEvento` leva o mesmo recuo do `dhEmi` (§4, E0008).
+- Cancelar de novo uma nota já cancelada volta **E0840** ("o evento de Cancelamento já está
+  vinculado à NFS-e") — medido em homologação.
+- **Substituição** é outro evento (e105102, com motivos próprios) e ainda não está na lib.
+
+## 17. Consulta da NFS-e pela chave
+
+`GET /nfse/{chave}` devolve `nfseXmlGZipB64` — o mesmo XML da emissão, de onde sai o DANFSe.
+404 = a chave não existe. Qualquer outro status é "não deu para saber", **nunca** "não existe".
+É o que permite à nota recuperada (`ja_emitida`) chegar com o XML, e não só com a chave.
+
+O XML da NFS-e **não traz `<chNFSe>`**: a chave mora no `Id` do `infNFSe` (`NFS` + 50 posições).
+E o `nNFSe` está dentro da própria chave (posições 24 a 36), o que serve de reserva quando o XML
+não veio. Layout: cMun 7 · tpAmb 1 · tpInsc 1 · CNPJ/CPF 14 · nNFSe 13 · AAMM 4 · código 9 · DV 1
+(conferido contra 325 NFS-e autorizadas).
+
+## 18. Distribuição DF-e — a caixa postal do CNPJ (ADN)
+
+`GET https://adn.nfse.gov.br/contribuintes/DFe/{NSU}?cnpjConsulta={CNPJ}&lote=true`, com o mesmo
+certificado (homologação: `adn.producaorestrita.nfse.gov.br`). Traz tudo o que está ligado ao
+CNPJ: as notas que ele **emitiu**, as que **recebeu** como tomador e os **eventos**.
+
+- Resposta: `StatusProcessamento` + `LoteDFe[]`; cada item tem `NSU`, `TipoDocumento` (`NFSE` |
+  `EVENTO`), `ChaveAcesso`, `TipoEvento` (texto, ex. `CANCELAMENTO`), `DataHoraGeracao` e
+  `ArquivoXml` (o XML em `gzip+base64` — com `lote=true` ele já vem embutido).
+- ~50 itens por página. A próxima página parte do **maior NSU recebido**; guarde-o para a
+  sincronização seguinte (o NSU só cresce).
+- O fim vem como `StatusProcessamento` de "nenhum documento" — e a grafia muda: já veio
+  `NenhumDocumentoLocalizado` e, em 31/10/2026, `NENHUM_DOCUMENTO_LOCALIZADO`. Compare sem caixa
+  nem `_`. O HTTP pode ser 404 nesse caso, com o corpo JSON normal.
+- **Limite de taxa (HTTP 429):** pausa de ~1 s entre páginas e, no 429, a MESMA página de novo
+  com espera crescente (3, 6, 9… s) — é o que a implementação de referência faz em produção para
+  baixar caixas de centenas de notas.
+- **Emitida × recebida:** o XML não diz de que lado o CNPJ está — compare o CNPJ do `<prest>` da
+  DPS (sem ele, o do `<emit>`) com o do certificado.
+
