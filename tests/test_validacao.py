@@ -5,6 +5,7 @@ loader tolerante, e property-based para CPF/CNPJ (mód-11) e o parser pt-BR da C
 from __future__ import annotations
 
 import copy
+from decimal import Decimal
 
 import pytest
 from conftest import CONFIG_VALIDA
@@ -12,8 +13,8 @@ from hypothesis import given
 from hypothesis import strategies as st
 
 from pynfsenacional import documentos
-from pynfsenacional.cli import _to_float
 from pynfsenacional.config import ClienteConfig, ConfigError, validar_tomador
+from pynfsenacional.dps import valor_decimal
 
 
 def _cfg(**mutacoes):
@@ -158,19 +159,27 @@ def test_mascara_nao_muda_validade(s):
     assert documentos.cpf_valido(s) == documentos.cpf_valido(documentos.digitos(s))
 
 
-# ── property-based: _to_float (pt-BR) ───────────────────────────────────────
+# ── valor do serviço em Decimal (pt-BR, float, int) ──────────────────────────
 @pytest.mark.parametrize(
-    "txt, esperado",
-    [("1.262,90", 1262.90), ("1262.90", 1262.90), ("100", 100.0), ("0,00", 0.0),
-     ("1.000.000,01", 1000000.01)],
+    "entrada, esperado",
+    [("1.262,90", "1262.90"), ("1262.90", "1262.90"), ("100", "100.00"), ("0,00", "0.00"),
+     ("1.000.000,01", "1000000.01"), ("R$ 1.941,72", "1941.72"), (1941.72, "1941.72"),
+     (2.675, "2.68"), (150, "150.00"), (Decimal("0.125"), "0.13")],
 )
-def test_to_float_ptbr(txt, esperado):
-    assert _to_float(txt) == pytest.approx(esperado)
+def test_valor_decimal(entrada, esperado):
+    assert valor_decimal(entrada) == Decimal(esperado)
+    assert str(valor_decimal(entrada)) == esperado
+
+
+@pytest.mark.parametrize("entrada", ["", "abc", "1,2,3", True, float("nan"), "Infinity"])
+def test_valor_decimal_recusa_lixo(entrada):
+    with pytest.raises(ValueError):
+        valor_decimal(entrada)
 
 
 @given(st.integers(min_value=0, max_value=99_999_999))
-def test_to_float_milhar_ptbr_roundtrip(centavos):
-    valor = centavos / 100
-    # formata com separador de milhar pt-BR ("1.234,56") e confere o round-trip
+def test_valor_decimal_milhar_ptbr_roundtrip(centavos):
+    valor = Decimal(centavos) / 100
+    # formata com separador de milhar pt-BR ("1.234,56") e confere o round-trip EXATO
     txt = f"{valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-    assert _to_float(txt) == pytest.approx(valor)
+    assert valor_decimal(txt) == valor

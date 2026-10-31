@@ -20,16 +20,25 @@ def assinar_dps(xml_dps: str, *, cert_pfx_path: str, senha: str) -> str:
     Delegado a `erpbrasil.assinatura`: assina apontando o `Reference` para o `Id` do
     `infDPS`. RSA-SHA1 (algoritmo do padrão NFe/NFSe).
     """
+    return assinar_xml(xml_dps, "infDPS", cert_pfx_path=cert_pfx_path, senha=senha)
+
+
+def assinar_xml(xml: str, no: str, *, cert_pfx_path: str, senha: str) -> str:
+    """Assina o filho `no` da raiz (pelo `Id` dele) e devolve o XML com o prolog UTF-8.
+
+    O mesmo perfil da DPS serve ao pedido de evento (`infPedReg`): a `<Signature>` entra
+    como último filho da raiz, depois do nó assinado.
+    """
     from erpbrasil.assinatura.assinatura import Assinatura
     from erpbrasil.assinatura.certificado import Certificado
 
-    raiz = etree.fromstring(xml_dps.encode("utf-8"))
-    inf = raiz.find(f"{{{NS}}}infDPS")
+    raiz = etree.fromstring(xml.encode("utf-8"))
+    inf = raiz.find(f"{{{NS}}}{no}")
     if inf is None:
-        raise ValueError("DPS sem nó infDPS — nada para assinar")
+        raise ValueError(f"XML sem nó {no} — nada para assinar")
     reference = inf.get("Id")
     if not reference:
-        raise ValueError("infDPS sem atributo Id — assinatura precisa do Reference")
+        raise ValueError(f"{no} sem atributo Id — assinatura precisa do Reference")
 
     cert = Certificado(cert_pfx_path, senha)
     assinado = Assinatura(cert).assina_xml2(raiz, reference)

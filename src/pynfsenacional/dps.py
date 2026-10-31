@@ -25,6 +25,7 @@ byte-a-byte idêntica à de uma implementação de referência em PHP (privada; 
 from __future__ import annotations
 
 import logging
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from typing import Any
 
 from lxml import etree
@@ -44,6 +45,28 @@ VER_APLIC = "PyNFSeNacional-0.1"   # ≤ 20 chars (TSVerAplic / E1235)
 # emite o grupo. O atributo `versao` fica na raiz <DPS>, FORA do infDPS assinado → o C14N/
 # DigestValue e o golden não mudam (a paridade com a implementação PHP de referência segue intacta).
 VERSAO_DPS = "1.01"
+
+
+def valor_decimal(valor: Decimal | float | int | str) -> Decimal:
+    """O valor do serviço em `Decimal` com 2 casas (arredondamento comercial).
+
+    Aceita Decimal, int, str ("1.262,90" pt-BR ou "1262.90") e float — o float passa por
+    `str()` antes, para não carregar o erro binário (2.675 vira 2.68, não 2.67)."""
+    if isinstance(valor, bool):
+        raise ValueError(f"valor inválido: {valor!r}")
+    if isinstance(valor, str):
+        texto = valor.strip().replace("R$", "").strip()
+        if "," in texto:
+            texto = texto.replace(".", "").replace(",", ".")
+    else:
+        texto = str(valor)
+    try:
+        d = Decimal(texto)
+    except InvalidOperation:
+        raise ValueError(f"valor inválido: {valor!r}") from None
+    if not d.is_finite():
+        raise ValueError(f"valor inválido: {valor!r}")
+    return d.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
 
 def _el(parent: etree._Element, tag: str, texto: str | None = None) -> etree._Element:
@@ -105,7 +128,7 @@ def _montar_end_toma(toma: etree._Element, end: Any) -> None:
 
 
 def montar_dps(
-    cfg: ClienteConfig, *, numero: str, valor: float, descricao: str,
+    cfg: ClienteConfig, *, numero: str, valor: Decimal | float | int | str, descricao: str,
     tomador: dict[str, Any] | None, ambiente: str, serie: str = "1",
     dh_emi: str | None = None, d_comp: str | None = None, ver_aplic: str | None = None,
 ) -> str:
@@ -209,7 +232,7 @@ def montar_dps(
     # Valores e tributos.
     valores = _el(inf, "valores")
     vsp = _el(valores, "vServPrest")
-    _el(vsp, "vServ", f"{float(valor):.2f}")
+    _el(vsp, "vServ", str(valor_decimal(valor)))
     trib = _el(valores, "trib")
     tm = _el(trib, "tribMun")
     _el(tm, "tribISSQN", str(s.tributos.get("tribISSQN", 1)))
