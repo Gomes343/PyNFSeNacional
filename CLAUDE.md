@@ -107,13 +107,13 @@ ponta a ponta: **validar → montar DPS → assinar → transporte mTLS → Nota
   e `Emissor.sincronizar_dfe` (`dfe.py`, caixa postal do ADN por NSU). Validados ao vivo em
   homologação. O contador de nDPS deixou de travar no `ja_emitida` (compara valor + tomador da
   nota achada) e o valor passou a `Decimal`. Regra em `docs/conhecimento-fiscal.md` §5, §16–§18.
-- **Os dois leiautes do XSD (31/10/2026, ainda não publicado):** a homologação aplica o pacote da
+- **1.3.0 (31/10/2026) — NT 009, os dois leiautes do XSD (em testes até a produção virar):** a homologação aplica o pacote da
   NT 009 (20/10/2026) e a produção o de 09/02/2026 — mesma `versao="1.01"`. `montar_dps` escolhe
   pelo ambiente (`config.leiaute_do_ambiente`; a config força com `"leiaute"`), e a DPS de produção
   saiu idêntica byte a byte (hashes pinados + golden com `leiaute=LEIAUTE_PRODUCAO`, que é o que a
   referência PHP monta). Os XSDs oficiais estão em `tests/xsd/` e `tests/test_leiaute.py` valida
   toda variante contra o do seu leiaute. Validado ao vivo em homologação, inclusive o Simples COM o
-  grupo IBS/CBS. Regra em `docs/conhecimento-fiscal.md` §19 (e §8: E0322, Anexo VIII).
+  grupo IBS/CBS. Regra em `docs/conhecimento-fiscal.md` §19 (e §8: E0322, Anexo VIII, Simples na integral `000001`).
 - `danfse.py` — DANFSe local via `BrazilFiscalReport` ≥ 1.0 (validado com XML de NFS-e real). ✅
 - `cli.py` — `nfse-nacional emitir` (`--pdf`/`--xml-out`/`--verbose`); logging com redação. ✅
 

@@ -346,6 +346,12 @@ NBS 1.2301.98.00, `cIndOp` 030101 (prestado no estabelecimento do fornecedor). O
 vem **em branco** para vários itens, entre eles os de profissão regulamentada, que podem ter
 redução de alíquota: é a decisão que a contabilidade tem de tomar, não a lib.
 
+**No Simples, a regra de partida é a tributação integral (`cClassTrib 000001`, `CST 000`).** O
+optante que recolhe pelo DAS não paga o IBS/CBS pela nota — o grupo informa, não cobra à parte —,
+então a classificação começa pela integral e a redução de cada item (profissão regulamentada etc.)
+entra depois, se e quando a contabilidade decidir lançá-la. A lib não escolhe: o `cClassTrib` vem
+da config.
+
 Ainda **não cobertos** (o validador recusa a config em vez de emitir pela metade): destinatário
 diferente do adquirente (`indDest=1` → grupo `<dest>`), compra governamental (`tpEnteGov`), nota
 de ajuste/referência (`gRefNFSe`), imóvel, redução/diferimento (`gTribRegular`, `gDif`) e crédito

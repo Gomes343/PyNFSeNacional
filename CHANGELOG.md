@@ -5,6 +5,15 @@ versionamento [SemVer](https://semver.org/lang/pt-BR/).
 
 ## [Não publicado]
 
+## [1.3.0] - 2026-10-31
+
+**A NT 009 implementada, pensada para 01/01/2027 — em fase de testes até a produção virar.** A
+homologação do SEFIN aplica o leiaute novo desde 31/10/2026; a lib já emite nele, inclusive o grupo
+IBS/CBS do Simples Nacional. A produção segue no leiaute atual (09/02/2026) e a DPS de produção não
+mudou um byte. Quando a produção virar de pacote, a config força o novo com `"leiaute": "20261020"`.
+Os campos do Simples que a NT 009 cria e o esquema publicado ainda não tem (`regApIBSCBSSN`,
+`cAtvSN`) entram quando o pacote os trouxer.
+
 ### Adicionado
 - **O leiaute da NT 009** (pacote de esquemas de 20/10/2026), que a homologação aplica desde
   31/10/2026 e recusava a DPS da lib com E1235. A lib monta os dois e escolhe pelo ambiente:

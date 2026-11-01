@@ -25,6 +25,13 @@ robô de navegador nem da API de PDF do governo.
 > referência e coberto por testes. A responsabilidade pela nota é sempre do emitente: **valide cada
 > emissão**.
 
+> 🗓️ **Reforma tributária: a NT 009 já está implementada (v1.3.0), pensada para 01/01/2027.** O
+> leiaute novo da DPS, que a homologação do SEFIN aplica desde 31/10/2026, já emite pela lib —
+> inclusive o grupo **IBS/CBS do Simples Nacional**, autorizado em homologação. Fica **em fase de
+> testes** até a produção virar de pacote; até lá a produção segue no leiaute atual, sem mudar um
+> byte, e a lib escolhe sozinha pelo ambiente. Detalhes em
+> [`docs/conhecimento-fiscal.md` §19](docs/conhecimento-fiscal.md).
+
 ---
 
 ## Por que existe
@@ -277,8 +284,9 @@ config (JSON)  →  montar DPS (XML)  →  assinar (XMLDSIG)  →  gzip+base64 �
 - ✅ **Regime Regular** (Não Optante — Lucro Presumido/Real): `pTotTrib`, `tpRetPisCofins`, Item da NBS
   e o **grupo IBS/CBS** (classificação: `cIndOp`, `CST`, `cClassTrib`) — v1.1.0
 - ✅ **ISS retido pelo tomador** (`tpRetISSQN=2`), com a recusa local de E0204/E0237 — v1.1.0
-- ✅ **Os dois leiautes do XSD** (produção 09/02/2026 e NT 009 de 20/10/2026, que a homologação já
-  aplica), escolhidos pelo ambiente; o grupo IBS/CBS do **Simples** autorizado em homologação
+- ✅ **NT 009 — os dois leiautes do XSD** (produção 09/02/2026 e NT 009 de 20/10/2026, que a
+  homologação já aplica), escolhidos pelo ambiente; o grupo IBS/CBS do **Simples** autorizado em
+  homologação — v1.3.0, em testes até a produção virar
 - ⏳ Os campos do Simples da NT 009 (`regApIBSCBSSN`, `cAtvSN`) quando entrarem no esquema; o grupo
   IBS/CBS do Simples é obrigatório a partir de 01/01/2027 (Ato Conjunto RFB/CGIBS nº 4/2026). E os
   casos ainda não cobertos do grupo: destinatário ≠ adquirente, compra governamental
