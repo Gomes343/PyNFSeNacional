@@ -107,6 +107,9 @@ ponta a ponta: **validar → montar DPS → assinar → transporte mTLS → Nota
   e `Emissor.sincronizar_dfe` (`dfe.py`, caixa postal do ADN por NSU). Validados ao vivo em
   homologação. O contador de nDPS deixou de travar no `ja_emitida` (compara valor + tomador da
   nota achada) e o valor passou a `Decimal`. Regra em `docs/conhecimento-fiscal.md` §5, §16–§18.
+- **1.3.1 (01/11/2026) — a recusa da caixa DF-e:** `dfe.sincronizar` lia `REJEICAO` como caixa vazia
+  (`parcial=False`, `erro=None`); hoje devolve `rejeitada=True`, `parcial=True`, `erros` e o motivo em
+  `erro` ("[E2245] Não há procuração…", HTTP 400 medido em produção). Campos novos, nada removido.
 - **1.3.0 (31/10/2026) — NT 009, os dois leiautes do XSD (em testes até a produção virar):** a homologação aplica o pacote da
   NT 009 (20/10/2026) e a produção o de 09/02/2026 — mesma `versao="1.01"`. `montar_dps` escolhe
   pelo ambiente (`config.leiaute_do_ambiente`; a config força com `"leiaute"`), e a DPS de produção
