@@ -102,6 +102,9 @@ ponta a ponta: **validar → montar DPS → assinar → transporte mTLS → Nota
   **mTLS validado ao vivo** em homologação (handshake + `HEAD /dps`, read-only). ✅
   Desde a 1.2.0 confere o certificado do SERVIDOR (cadeia pública; os endpoints de município
   ficam sem conferência por padrão), devolve TODOS os erros e explica o HTTP sem E-code.
+- **1.2.1 (01/11/2026) — a recusa da caixa DF-e:** `dfe.sincronizar` lia `REJEICAO` como caixa vazia
+  (`parcial=False`, `erro=None`); hoje devolve `rejeitada=True`, `parcial=True`, `erros` e o motivo em
+  `erro` ("[E2245] Não há procuração…", HTTP 400 medido em produção). Campos novos, nada removido.
 - **1.2.0 (31/10/2026) — ciclo de vida da nota:** `Emissor.consultar` (`GET /nfse/{chave}`),
   `Emissor.cancelar` (`eventos.py`, e101101/e101103 — o pedido é byte a byte o da referência PHP)
   e `Emissor.sincronizar_dfe` (`dfe.py`, caixa postal do ADN por NSU). Validados ao vivo em

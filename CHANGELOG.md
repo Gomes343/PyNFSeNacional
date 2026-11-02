@@ -5,6 +5,8 @@ versionamento [SemVer](https://semver.org/lang/pt-BR/).
 
 ## [Não publicado]
 
+## [1.2.1] - 2026-11-01
+
 ### Corrigido
 - **A recusa da distribuição DF-e lia como caixa vazia.** `sincronizar` tratava
   `StatusProcessamento: REJEICAO` como fim de leitura (`parcial=False`, `erro=None`), e o HTTP 400
