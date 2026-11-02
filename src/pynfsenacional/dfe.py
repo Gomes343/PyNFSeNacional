@@ -21,17 +21,31 @@ from typing import Any
 from lxml import etree
 
 from . import chave as _chave
-from .sefin import SefinClient, _descomprimir, _falha_http
+from .sefin import SefinClient, _descomprimir, _erros, _falha_http, _msg_erros
 
 logger = logging.getLogger("pynfsenacional.dfe")
 
-# StatusProcessamento que encerram a leitura (não há mais o que buscar). O ADN já respondeu
+# StatusProcessamento que encerra a leitura (não há mais o que buscar). O ADN já respondeu
 # "NenhumDocumentoLocalizado" e "NENHUM_DOCUMENTO_LOCALIZADO" — compara-se sem caixa nem "_".
-STATUS_FIM = ("nenhumdocumentolocalizado", "rejeicao")
+STATUS_FIM = ("nenhumdocumentolocalizado",)
+# A RECUSA também encerra, mas NÃO é "nada a ler": o ADN não leu a caixa. Medido em produção
+# (01/11/2026): consulta por procuração sem a procuração do serviço volta HTTP 400,
+# `StatusProcessamento: "REJEICAO"` e `Erros: [{"Codigo": "E2245", "Descricao": "Não há
+# procuração da inscrição … para a inscrição …"}]`. Até a 1.2.0 a rejeição encerrava com
+# `parcial=False` e `erro=None` — igual a uma caixa vazia.
+STATUS_REJEICAO = ("rejeicao",)
+
+
+def _norm(status: str | None) -> str:
+    return (status or "").replace("_", "").lower()
 
 
 def _fim(status: str | None) -> bool:
-    return (status or "").replace("_", "").lower() in STATUS_FIM
+    return _norm(status) in STATUS_FIM
+
+
+def _rejeicao(status: str | None) -> bool:
+    return _norm(status) in STATUS_REJEICAO
 
 
 def prestador_do_xml(xml: str | None) -> str | None:
@@ -78,8 +92,11 @@ class RespostaDfe:
     ultimo_nsu: int = 0
     status: str | None = None
     tem_mais: bool = False      # parou no teto de páginas; chame de novo com `ultimo_nsu`
-    parcial: bool = False       # parou por erro/limite; o que veio está em `documentos`
+    parcial: bool = False       # parou por erro/limite/recusa; o que veio está em `documentos`
     erro: str | None = None
+    rejeitada: bool = False     # o ADN RECUSOU a consulta (ex.: E2245, sem procuração)
+    # cada erro da recusa: {codigo, descricao, complemento}
+    erros: list[dict[str, str | None]] = field(default_factory=list)
 
 
 def _documento(bruto: dict[str, Any]) -> DocumentoDfe:
@@ -127,16 +144,34 @@ def sincronizar(cliente: SefinClient, cnpj: str, nsu: int = 0, *, max_paginas: i
             tentativas_429 += 1
             dormir(3.0 * tentativas_429)
             continue
-        if r.status_code not in (200, 404):
+        if r.status_code not in (200, 400, 404):
             resp.parcial, resp.erro = True, _falha_http(r.status_code, "distribuição DF-e")
             return resp
-        tentativas_429 = 0
-        pagina += 1
         try:
             dados: dict[str, Any] = r.json()
         except ValueError:
+            if r.status_code == 400:
+                resp.parcial, resp.erro = True, _falha_http(400, "distribuição DF-e")
             return resp     # corpo vazio = nada a ler
-        resp.status = dados.get("StatusProcessamento") or dados.get("statusProcessamento")
+        if not isinstance(dados, dict):
+            dados = {}
+        status = dados.get("StatusProcessamento") or dados.get("statusProcessamento")
+        if _rejeicao(status) or r.status_code == 400:
+            # Recusa: não leu a caixa. Guarda o motivo (todos os erros) e para — repetir não
+            # muda a resposta, e lida como "nenhum documento" seria um falso negativo.
+            resp.status = status
+            resp.rejeitada, resp.parcial = True, True
+            resp.erros = _erros({"erros": dados.get("Erros") or dados.get("erros")
+                                 or dados.get("erro") or []})
+            if resp.erros:
+                cod = resp.erros[0]["codigo"]
+                resp.erro = (f"[{cod}] " if cod else "") + _msg_erros(resp.erros)
+            else:
+                resp.erro = _falha_http(r.status_code, "distribuição DF-e recusada")
+            return resp
+        tentativas_429 = 0
+        pagina += 1
+        resp.status = status
         lote = dados.get("LoteDFe") or dados.get("loteDFe") or []
         for bruto in lote:
             if isinstance(bruto, dict):

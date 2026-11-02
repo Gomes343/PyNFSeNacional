@@ -5,6 +5,15 @@ versionamento [SemVer](https://semver.org/lang/pt-BR/).
 
 ## [Não publicado]
 
+### Corrigido
+- **A recusa da distribuição DF-e lia como caixa vazia.** `sincronizar` tratava
+  `StatusProcessamento: REJEICAO` como fim de leitura (`parcial=False`, `erro=None`), e o HTTP 400
+  só como "HTTP 400" — o motivo se perdia. Medido em produção: consulta por procuração sem a
+  procuração do serviço NFS-e volta 400 + `REJEICAO` + `E2245` ("Não há procuração da inscrição …").
+  Agora a `RespostaDfe` diz `rejeitada=True`, `parcial=True`, guarda todos os `erros`
+  (`{codigo, descricao, complemento}`) e `erro` traz "[E2245] …". Repetir não muda a resposta, então
+  a recusa não se repete. Campos novos, nada removido.
+
 ## [1.2.0] - 2026-10-31
 
 ### Corrigido
