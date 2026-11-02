@@ -266,6 +266,41 @@ def test_dfe_falha_devolve_o_parcial(falha, trecho):
     assert r.ultimo_nsu == 9 and len(r.documentos) == 1   # o que veio fica
 
 
+def test_dfe_rejeicao_sem_procuracao_nao_e_caixa_vazia():
+    """Medido em produção (01/11/2026): sem a procuração do serviço, HTTP 400 + REJEICAO + E2245.
+    Até a 1.2.0 isso encerrava com parcial=False e erro=None — o mesmo que "nenhum documento"."""
+    adn = FakeAdn([FakeResp(400, {
+        "TipoConsulta": "InscricaoCertificado", "StatusProcessamento": "REJEICAO", "LoteDFe": [],
+        "Erros": [{"Codigo": "E2245",
+                   "Descricao": "Não há procuração da inscrição A para a B."}]})])
+    r = dfe.sincronizar(adn, "11222333000181", 0, dormir=lambda s: None)
+    assert r.rejeitada and r.parcial and not r.tem_mais
+    assert r.erro == "[E2245] Não há procuração da inscrição A para a B."
+    assert r.erros[0]["codigo"] == "E2245" and r.ultimo_nsu == 0 and not r.documentos
+    assert len(adn.pedidos) == 1          # recusa não se repete
+
+
+def test_dfe_rejeicao_em_200_tambem_e_recusa():
+    adn = FakeAdn([FakeResp(200, {"LoteDFe": [_item(4)]}),
+                   FakeResp(200, {"StatusProcessamento": "Rejeicao", "Erros": []})])
+    r = dfe.sincronizar(adn, "11222333000181", 3, dormir=lambda s: None)
+    assert r.rejeitada and r.parcial and "recusada" in r.erro
+    assert r.ultimo_nsu == 4 and len(r.documentos) == 1   # o que veio antes fica
+
+
+def test_dfe_nenhum_documento_controle_negativo():
+    """O fim de verdade continua sendo fim: nada de rejeição, nada de parcial."""
+    adn = FakeAdn([FakeResp(404, {"StatusProcessamento": "NENHUM_DOCUMENTO_LOCALIZADO"})])
+    r = dfe.sincronizar(adn, "11222333000181", 7, dormir=lambda s: None)
+    assert not r.rejeitada and not r.parcial and r.erro is None and r.erros == []
+
+
+def test_dfe_400_sem_corpo_e_falha():
+    adn = FakeAdn([FakeResp(400)])
+    r = dfe.sincronizar(adn, "11222333000181", 0, dormir=lambda s: None)
+    assert r.parcial and "HTTP 400" in r.erro
+
+
 def test_dfe_nsu_negativo():
     with pytest.raises(ValueError):
         dfe.sincronizar(FakeAdn([]), "11222333000181", -1)
