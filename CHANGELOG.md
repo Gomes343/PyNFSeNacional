@@ -5,6 +5,14 @@ versionamento [SemVer](https://semver.org/lang/pt-BR/).
 
 ## [Não publicado]
 
+### Corrigido
+- **`mesma_nota` lia o tomador diferente da DPS.** A DPS lê o documento em `cpf_cnpj`, `cpf` ou
+  `cnpj`; a comparação lia `cpf_cnpj` ou `documento`. Com o tomador em `cnpj`/`cpf`, a nota já
+  emitida (resposta perdida) parecia OUTRA: o contador pulava o número e a nota era enviada de
+  novo. As duas leituras agora são uma só, `dps.documento_tomador`, e o documento do XML é
+  normalizado como o da DPS. Com `documento`, que a DPS não leva, a nota sem `<toma>` deixa de
+  parecer outra.
+
 ## [1.3.1] - 2026-11-01
 
 ### Corrigido

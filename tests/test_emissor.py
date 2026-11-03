@@ -200,6 +200,63 @@ def test_mesma_nota(xml, valor, tomador, esperado):
     assert mesma_nota(xml, valor, tomador) is esperado
 
 
+CNPJ_TOMADOR = "11222333000181"
+
+
+def _xml_toma(tag, doc, valor="150.00"):
+    return (f'<NFSe xmlns="http://www.sped.fazenda.gov.br/nfse"><infNFSe Id="NFS{CHAVE}">'
+            f"<DPS><infDPS><toma><{tag}>{doc}</{tag}></toma><valores><vServPrest>"
+            f"<vServ>{valor}</vServ></vServPrest></valores></infDPS></DPS></infNFSe></NFSe>")
+
+
+@pytest.mark.parametrize("xml, tomador, esperado", [
+    # o tomador lido como a DPS o escreve: `cpf` e `cnpj` também (até a 1.3.1 davam False)
+    (nfse_xml(), {"cpf": "111.444.777-35"}, True),
+    (_xml_toma("CNPJ", CNPJ_TOMADOR), {"cnpj": "11.222.333/0001-81"}, True),
+    (_xml_toma("CNPJ", CNPJ_TOMADOR), {"cnpj": "52.998.224/0001-00"}, False),
+    # `documento` não vai à DPS (sai sem <toma>): comparar com ele dava False à própria nota
+    (nfse_xml(doc=None), {"documento": CPF_TOMADOR}, True),
+    # NIF: a DPS desta lib ainda não monta <NIF> — o tomador só com NIF sai sem <toma>…
+    (nfse_xml(doc=None), {"nif": "3101234567"}, True),
+    # …e uma NFS-e de OUTRO emissor, com tomador do exterior, não é a nota sem tomador
+    (_xml_toma("NIF", "3101234567"), None, False),
+    (_xml_toma("NIF", "3101234567"), TOMADOR, False),
+])
+def test_mesma_nota_le_o_tomador_como_a_dps(xml, tomador, esperado):
+    assert mesma_nota(xml, Decimal("150"), tomador) is esperado
+
+
+@pytest.mark.parametrize("tomador", [
+    TOMADOR,
+    {"cpf": CPF_TOMADOR, "nome": "Fulano"},
+    {"cnpj": CNPJ_TOMADOR, "nome": "Empresa"},
+    {"cpf_cnpj": "11.222.333/0001-81", "nome": "Empresa"},
+    {"documento": CPF_TOMADOR, "nome": "Fulano"},
+    {"nif": "3101234567", "nome": "Abroad Inc"},
+    None,
+])
+def test_a_dps_montada_e_a_mesma_nota_dela(config_dict, tomador):
+    """A propriedade que importa: a nota que a lib monta, achada de volta na SEFIN, é a
+    nota pedida — qualquer que seja a chave em que o tomador veio."""
+    from pynfsenacional import dps
+    xml = dps.montar_dps(ClienteConfig.from_dict(config_dict), numero="1",
+                         valor=Decimal("150"), descricao="x", tomador=tomador,
+                         ambiente="homologacao")
+    assert mesma_nota(xml, Decimal("150.00"), tomador) is True
+    assert mesma_nota(xml, Decimal("150.01"), tomador) is False
+
+
+def test_ja_emitida_tomador_em_cnpj_recupera_e_nao_duplica(emissor, monkeypatch):
+    """Até a 1.3.1, o tomador em `cnpj` fazia a própria nota achada parecer OUTRA: o contador
+    pulava o número e a nota era enviada de novo."""
+    fake = FakeSefin(existentes={1: (CHAVE, _xml_toma("CNPJ", CNPJ_TOMADOR))}, resp=_ok())
+    monkeypatch.setattr(emissor, "_sefin_client", lambda: fake)
+    nota = emissor.emitir(valor=Decimal("150.00"), descricao="Servico de teste",
+                          tomador={"cnpj": CNPJ_TOMADOR, "nome": "Empresa"})
+    assert nota.status == "ja_emitida" and nota.chave_acesso == CHAVE
+    assert fake.emitiu is None and _contador(emissor) == "2"
+
+
 # ── consultar ────────────────────────────────────────────────────────────────
 def test_consultar(emissor, monkeypatch):
     fake = FakeSefin(existentes={1: (CHAVE, nfse_xml())})

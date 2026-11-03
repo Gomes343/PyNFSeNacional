@@ -100,6 +100,19 @@ def id_dps(cfg: ClienteConfig, numero: str, serie: str = "1") -> str:
     )
 
 
+def documento_tomador(tomador: dict[str, Any] | None) -> str:
+    """O documento que vai no ``<toma>`` da DPS (``CPF``/``CNPJ``) — "" quando a DPS sai sem
+    ``<toma>`` (consumidor final). Lê ``cpf_cnpj``, ``cpf`` ou ``cnpj``; o CNPJ alfanumérico
+    mantém as letras. É a leitura ÚNICA: quem compara uma NFS-e achada na SEFIN com a nota
+    pedida (``emissor.mesma_nota``) tem de ler o tomador como a DPS o escreve, senão a nota
+    pedida parece outra (e o contador pula o número dela) ou outra parece a pedida.
+
+    ⚠️ ``nif`` (tomador do exterior) não entra: a DPS desta lib ainda não monta ``<NIF>``, e um
+    tomador só com NIF sai SEM ``<toma>``."""
+    tom = tomador or {}
+    return documentos.norm_documento(tom.get("cpf_cnpj") or tom.get("cpf") or tom.get("cnpj"))
+
+
 def _montar_end_toma(toma: etree._Element, end: Any) -> None:
     """Anexa o bloco ``<end>`` (TCEndereco nacional) ao ``<toma>``/``<interm>``, na ordem
     EXATA do XSD: ``endNac(cMun, CEP) → xLgr → nro → xCpl? → xBairro``.
@@ -207,7 +220,7 @@ def montar_dps(
     # golden, cujo tomador não tem endereço, segue bate-byte). Espelha o buildTomador do PHP.
     tom = tomador or {}
     # CNPJ alfanumérico do tomador: preserva letras; CPF (só dígitos) sai igual.
-    doc = documentos.norm_documento(tom.get("cpf_cnpj") or tom.get("cpf") or tom.get("cnpj"))
+    doc = documento_tomador(tom)
     if doc:
         toma = _el(inf, "toma")
         _el(toma, "CNPJ" if len(doc) == 14 else "CPF", doc)

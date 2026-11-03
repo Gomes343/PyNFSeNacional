@@ -15,7 +15,7 @@ from typing import Any
 
 from lxml import etree
 
-from . import assinatura, dfe, dps, eventos, sefin
+from . import assinatura, dfe, documentos, dps, eventos, sefin
 from . import chave as _chave
 from .config import (
     LEIAUTE_NT009,
@@ -86,9 +86,12 @@ def _dica_leiaute(msg: str | None, codigo: str | None, leiaute: str) -> str | No
 
 
 def _doc(tomador: dict[str, Any] | None) -> str:
-    if not tomador:
-        return ""
-    return _chave.limpar(str(tomador.get("cpf_cnpj") or tomador.get("documento") or ""))
+    """O documento do tomador como a DPS o escreve (`dps.documento_tomador`). Até a 1.3.1 lia
+    `cpf_cnpj`/`documento`, e a DPS lê `cpf_cnpj`/`cpf`/`cnpj`: com o tomador em `cnpj` ou
+    `cpf`, a própria nota achada na SEFIN parecia OUTRA e o contador pulava o número dela (a
+    nota saía de novo, duplicada); com `documento`, a DPS saía sem `<toma>` e comparava um
+    documento que ela não tinha."""
+    return dps.documento_tomador(tomador)
 
 
 def mesma_nota(nfse_xml: str | None, valor: Any, tomador: dict[str, Any] | None) -> bool | None:
@@ -112,7 +115,7 @@ def mesma_nota(nfse_xml: str | None, valor: Any, tomador: dict[str, Any] | None)
         for tag in ("CNPJ", "CPF", "NIF"):
             el = toma.find(f"{{*}}{tag}")
             if el is not None and el.text:
-                doc_xml = _chave.limpar(el.text)
+                doc_xml = documentos.norm_documento(el.text)
                 break
     return doc_xml == _doc(tomador)
 

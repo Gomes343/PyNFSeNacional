@@ -218,7 +218,15 @@ município + código + data) para descobrir/confirmar o `cTribMun` — confirmar
   reenvio não faz dela outra nota). Mesma nota → `ja_emitida` com o XML; outra nota → pula o
   número; sem XML para conferir → `ja_emitida` (o ambíguo conta como feito). O contador avança
   nos três casos. Até a 1.1.0 ele não avançava, e toda emissão seguinte caía na mesma DPS.
-  Quem passa o `numero=` explícito controla a numeração: a lib só recupera a nota.
+  Quem passa o `numero=` explícito controla a numeração: a lib só recupera a nota, **sem
+  conferir** — e a nota achada pode ser de outro emissor que usou a mesma série. Confira com
+  `emissor.mesma_nota(nota.nfse_xml, valor, tomador)` (`False` = outra nota, a pedida não saiu;
+  `None` = sem XML para conferir).
+- O documento do tomador é lido **como a DPS o escreve** (`dps.documento_tomador`: `cpf_cnpj`,
+  `cpf` ou `cnpj`). Até a 1.3.1 a comparação lia `cpf_cnpj`/`documento`: com o tomador em
+  `cnpj`/`cpf`, a própria nota parecia outra e o contador pulava o número dela, enviando-a de
+  novo. A DPS ainda não monta `<NIF>` (tomador do exterior): o tomador só com NIF sai sem
+  `<toma>`, e é assim que ele é comparado.
 
 ### ★ Quando o prestador JÁ emitia por outro sistema — use uma série dedicada
 
