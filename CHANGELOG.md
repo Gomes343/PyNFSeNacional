@@ -5,6 +5,8 @@ versionamento [SemVer](https://semver.org/lang/pt-BR/).
 
 ## [Não publicado]
 
+## [1.3.2] - 2026-11-03
+
 ### Corrigido
 - **`mesma_nota` lia o tomador diferente da DPS.** A DPS lê o documento em `cpf_cnpj`, `cpf` ou
   `cnpj`; a comparação lia `cpf_cnpj` ou `documento`. Com o tomador em `cnpj`/`cpf`, a nota já
