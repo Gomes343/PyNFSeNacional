@@ -257,10 +257,29 @@ def montar_dps(
         _el(cserv, "cNBS", nbs)
     if nt009:
         _el(cserv, "xDescServ", desc)
+    # atvEvento (0-1), depois de comExt/obra (que não emitimos) e antes do infoCompl. Obrigatório
+    # no item 12 (E0390); o local é UM dos dois — idAtvEvt OU end (TCEnderecoSimples).
+    ev = s.evento or {}
+    if ev:
+        atv = _el(serv, "atvEvento")
+        _el(atv, "xNome", str(ev["nome"]).strip()[:255])
+        _el(atv, "dtIni", str(ev["inicio"]))
+        _el(atv, "dtFim", str(ev["fim"]))
+        if str(ev.get("id") or "").strip():
+            _el(atv, "idAtvEvt", str(ev["id"]).strip())
+        else:
+            e = ev["endereco"]
+            end = _el(atv, "end")
+            _el(end, "CEP", documentos.digitos(e["cep"]))
+            _el(end, "xLgr", str(e["logradouro"]).strip())
+            _el(end, "nro", str(e["numero"]).strip())
+            if str(e.get("complemento") or "").strip():
+                _el(end, "xCpl", str(e["complemento"]).strip())
+            _el(end, "xBairro", str(e["bairro"]).strip())
     # infoCompl (0-1) é o ÚLTIMO filho de <serv> no XSD (TCServ) — depois de locPrest/cServ e de
-    # comExt/obra/atvEvento/explRod, que não emitimos. Texto livre, sem efeito fiscal: o SEFIN não
-    # o interpreta e o DANFSe o imprime como "Inf. Cont.:". Vazio → o grupo inteiro é OMITIDO
-    # (um <infoCompl/> sem filho é falha de schema, e xInfComp tem minLength=1).
+    # comExt/obra/atvEvento/explRod (comExt/obra/explRod não emitimos). Texto livre, sem efeito
+    # fiscal: o SEFIN não o interpreta e o DANFSe o imprime como "Inf. Cont.:". Vazio → o grupo
+    # inteiro é OMITIDO (um <infoCompl/> sem filho é falha de schema; xInfComp tem minLength=1).
     info_compl = (s.info_complementares or "").strip()
     if info_compl:
         _el(_el(serv, "infoCompl"), "xInfComp", info_compl[:2000])  # TSDescInfCompl: 1-2000

@@ -142,6 +142,15 @@ class Servico:
     # cIndOp, CST, cClassTrib (obrigatórias no bloco), indFinal (opcional), finNFSe e indDest
     # (só "0"). Vazio = grupo omitido — o Simples dispensa o grupo até 31/12/2026.
     ibscbs: dict[str, Any] = field(default_factory=dict)
+    # Grupo Atividade/Evento (serv/atvEvento, TCAtvEvento). OBRIGATÓRIO quando o cTribNac é do
+    # item 12 da lista (diversões, lazer, competições esportivas…): sem ele a SEFIN devolve
+    # E0390. É também o item cujo ISS vai ao LOCAL DO EVENTO (LC 116, art. 3º). Chaves:
+    #   "nome"   — xNome, 1-255 (o nome/descrição do evento)
+    #   "inicio" / "fim" — AAAA-MM-DD (TSData)
+    #   e UM dos dois: "id" (idAtvEvt, a identificação que o município dá ao evento) OU
+    #   "endereco" {cep, logradouro, numero, complemento?, bairro} — endereço NACIONAL do evento.
+    # Vazio = grupo omitido (a DPS de quem não é do item 12 sai como sempre saiu).
+    evento: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -267,6 +276,7 @@ class ClienteConfig:
                 except ValueError:
                     problemas.append(f"servico.tributos.pTotTribSN não é numérico: {ptot!r}")
 
+        problemas += validar_evento(s.evento, s.cTribNac)
         problemas += self._validar_regime_regular()
 
         # Ambiente
@@ -403,6 +413,45 @@ class ClienteConfig:
                     "grupo <dest>, que esta biblioteca ainda não emite — §8"
                 )
         return problemas
+
+
+def validar_evento(evento: dict[str, Any] | None, cTribNac: str = "") -> list[str]:
+    """Problemas do grupo Atividade/Evento (vazia = ok). Item 12 sem evento é E0390; com
+    evento, o grupo tem de passar no XSD (TCAtvEvento) — nome, datas e o local (id OU endereço
+    nacional completo: CEP, logradouro, número e bairro)."""
+    from datetime import date
+    ev = evento or {}
+    problemas: list[str] = []
+    if not ev:
+        if str(cTribNac or "").startswith("12"):
+            problemas.append(
+                f"E0390: o cTribNac {cTribNac} é do item 12 da lista de serviços — a DPS exige o "
+                f"grupo Atividade/Evento (servico.evento: nome, inicio, fim e id ou endereco)"
+            )
+        return problemas
+    if not str(ev.get("nome") or "").strip():
+        problemas.append("evento.nome (xNome) é obrigatório")
+    datas = {}
+    for chave in ("inicio", "fim"):
+        try:
+            datas[chave] = date.fromisoformat(str(ev.get(chave) or ""))
+        except ValueError:
+            problemas.append(
+                f"evento.{chave} deve ser AAAA-MM-DD (TSData); recebido {ev.get(chave)!r}")
+    if len(datas) == 2 and datas["fim"] < datas["inicio"]:
+        problemas.append(f"evento: fim ({ev['fim']}) antes do início ({ev['inicio']})")
+    end = ev.get("endereco") or {}
+    if str(ev.get("id") or "").strip():
+        pass
+    elif not end:
+        problemas.append("evento: informe o local — 'id' (identificação do evento) ou 'endereco'")
+    else:
+        if len(documentos.digitos(end.get("cep"))) != 8:
+            problemas.append(f"evento.endereco.cep deve ter 8 dígitos: {end.get('cep')!r}")
+        for chave in ("logradouro", "numero", "bairro"):
+            if not str(end.get(chave) or "").strip():
+                problemas.append(f"evento.endereco.{chave} é obrigatório")
+    return problemas
 
 
 def validar_tomador(tomador: dict[str, Any] | None) -> list[str]:

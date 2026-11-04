@@ -80,6 +80,12 @@ def _regular(**servico: Any) -> dict[str, Any]:
 # do Anexo VIII para "demais serviços" (01.01: NBS 1.1502.10.00, cIndOp 100301).
 IBSCBS_SIMPLES = {"cIndOp": "100301", "CST": "000", "cClassTrib": "000001", "indFinal": "0"}
 
+EVENTO_ENDERECO = {"nome": "Arbitragem de FUTSAL", "inicio": "2026-11-04", "fim": "2026-11-04",
+                   "endereco": {"cep": "01310-100", "logradouro": "AVENIDA PAULISTA",
+                                "numero": "1000", "complemento": "SALA 1", "bairro": "BELA VISTA"}}
+EVENTO_ID = {"nome": "Campeonato de teste", "inicio": "2026-10-01", "fim": "2026-10-31",
+             "id": "256277"}
+
 CONFIGS = {
     "simples": _simples(),
     "simples_im_infocompl": _com_im(),
@@ -89,6 +95,10 @@ CONFIGS = {
     "regular_sem_indfinal": _regular(ibscbs={"cIndOp": "050101", "CST": "000",
                                              "cClassTrib": "000001"}),
     "regular_retido": _regular(tributos={"tpRetISSQN": 2}),
+    # Item 12 (competições esportivas): grupo Atividade/Evento, local por endereço ou por id.
+    "simples_evento_endereco": _simples(cTribNac="121101", cTribMun="", evento=EVENTO_ENDERECO),
+    "simples_evento_id": _simples(cTribNac="121101", cTribMun="", evento=EVENTO_ID,
+                                  info_complementares="Sem retencao de IRRF."),
 }
 TOMADORES = {
     "sem_tomador": None,

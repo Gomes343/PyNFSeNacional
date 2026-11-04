@@ -261,3 +261,60 @@ def test_endereco_incompleto_do_tomador_avisa_no_log(caplog):
         _montar(ClienteConfig.from_dict(CONFIG_VALIDA), tomador=tom)
     assert "bairro" in caplog.text and "OMITIDO" in caplog.text
     assert "RUA EXEMPLO" not in caplog.text and "01000000" not in caplog.text
+
+
+# ── Grupo Atividade/Evento (item 12 da lista; E0390 sem ele) ────────────────────────────────
+
+_EVENTO = {"nome": "Arbitragem de FUTSAL", "inicio": "2026-11-04", "fim": "2026-11-04",
+           "endereco": {"cep": "12630-000", "logradouro": "CORONEL DOMICIANO", "numero": "92",
+                        "complemento": "PREDIO", "bairro": "CENTRO"}}
+
+
+def _cfg_evento(**ev):
+    return ClienteConfig.from_dict(
+        {**CONFIG_VALIDA,
+         "servico": {**CONFIG_VALIDA["servico"], "cTribNac": "121101", "cTribMun": "",
+                     "info_complementares": "x", "evento": {**_EVENTO, **ev}}})
+
+
+def test_evento_vai_entre_cserv_e_infocompl_com_o_endereco():
+    inf = _inf(_montar(_cfg_evento()))
+    serv = inf.find(f"{{{NS}}}serv")
+    assert [etree.QName(c).localname for c in serv] == [
+        "locPrest", "cServ", "atvEvento", "infoCompl"]
+    atv = serv.find(f"{{{NS}}}atvEvento")
+    assert [etree.QName(c).localname for c in atv] == ["xNome", "dtIni", "dtFim", "end"]
+    assert [etree.QName(c).localname for c in atv.find(f"{{{NS}}}end")] == [
+        "CEP", "xLgr", "nro", "xCpl", "xBairro"]
+    assert _txt(inf, "serv/atvEvento/end/CEP") == "12630000"
+    assert _txt(inf, "serv/atvEvento/dtIni") == "2026-11-04"
+
+
+def test_evento_com_id_nao_leva_endereco():
+    inf = _inf(_montar(_cfg_evento(id="256277")))
+    atv = inf.find(f"{{{NS}}}serv/{{{NS}}}atvEvento")
+    assert [etree.QName(c).localname for c in atv] == ["xNome", "dtIni", "dtFim", "idAtvEvt"]
+
+
+def test_sem_evento_xml_inalterado():
+    inf = _inf(_montar(ClienteConfig.from_dict(CONFIG_VALIDA)))
+    assert inf.find(f"{{{NS}}}serv/{{{NS}}}atvEvento") is None
+
+
+def test_item_12_sem_evento_e_e0390_antes_do_envio():
+    cfg = ClienteConfig.from_dict(
+        {**CONFIG_VALIDA, "servico": {**CONFIG_VALIDA["servico"], "cTribNac": "121101",
+                                      "cTribMun": ""}})
+    assert any("E0390" in p for p in cfg.validar())
+    assert _cfg_evento().validar() == []
+
+
+@pytest.mark.parametrize("ev,trecho", [
+    ({"nome": ""}, "evento.nome"),
+    ({"inicio": "04/11/2026"}, "evento.inicio"),
+    ({"inicio": "2026-11-05"}, "antes do início"),
+    ({"endereco": {}}, "informe o local"),
+    ({"endereco": {**_EVENTO["endereco"], "numero": ""}}, "evento.endereco.numero"),
+])
+def test_evento_incompleto_e_recusado(ev, trecho):
+    assert any(trecho in p for p in _cfg_evento(**ev).validar())
