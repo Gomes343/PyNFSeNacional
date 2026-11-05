@@ -28,6 +28,7 @@ import re
 import warnings
 from dataclasses import dataclass, field
 from typing import Any
+from urllib.parse import quote
 
 import requests
 import urllib3
@@ -293,6 +294,53 @@ class SefinClient:
             params={"cnpjConsulta": cnpj, "lote": "true" if lote else "false"},
             headers={"Accept": "application/json"},
         )
+
+    # ── parametrização do município (ADN, só leitura) ─────────────────────────
+    def _get_parametrizacao(self, caminho: str, contexto: str) -> dict[str, Any] | None:
+        """GET {adn}/parametrizacao/… → o JSON; None no 404 (o ADN responde 404 com
+        `mensagem` quando o município/serviço não tem o parâmetro). Qualquer outro status
+        levanta `RuntimeError` — "não deu para saber" nunca vira "não existe"."""
+        r = self._req_url("GET", f"{self.adn_url}/parametrizacao/{caminho}",
+                          headers={"Accept": "application/json"})
+        if r.status_code == 404:
+            return None
+        if r.status_code != 200:
+            raise RuntimeError(_falha_http(r.status_code, contexto))
+        try:
+            dados: dict[str, Any] = r.json()
+        except ValueError:
+            raise RuntimeError(f"{contexto}: resposta não-JSON") from None
+        return dados
+
+    def parametros_convenio(self, codigo_municipio: str) -> dict[str, Any] | None:
+        """Os parâmetros do convênio do município (IBGE, 7 díg) com o ambiente nacional —
+        `aderenteAmbienteNacional`, `aderenteEmissorNacional`, … (1 = sim). None se o
+        município não tem convênio."""
+        mun = re.sub(r"\D", "", codigo_municipio or "")
+        dados = self._get_parametrizacao(f"{mun}/convenio",
+                                         "consulta do convênio do município falhou")
+        if dados is None:
+            return None
+        par = dados.get("parametrosConvenio")
+        return par if isinstance(par, dict) else None
+
+    def aliquotas(self, codigo_municipio: str, codigo_servico: str,
+                  competencia: str | None = None) -> list[dict[str, Any]]:
+        """As alíquotas de ISS que o município parametrizou para o serviço
+        (`codigo_servico` = cTribNac + cTribMun no formato `00.00.00.000`) na `competencia`
+        (AAAA-MM-DD; sem ela, o histórico inteiro). Cada item: `Incidencia`, `Aliq`, `DtIni`,
+        `DtFim`. Lista vazia = o município não administra esse código (é o que antecede o
+        E0312 na emissão)."""
+        mun = re.sub(r"\D", "", codigo_municipio or "")
+        serv = quote(codigo_servico.strip(), safe="")
+        if competencia:
+            dh = competencia if "T" in competencia else f"{competencia}T12:00:00"
+            caminho = f"{mun}/{serv}/{quote(dh, safe='')}/aliquota"
+        else:
+            caminho = f"{mun}/{serv}/historicoaliquotas"
+        dados = self._get_parametrizacao(caminho, "consulta de alíquota falhou")
+        lista = ((dados or {}).get("aliquotas") or {}).get(codigo_servico.strip()) or []
+        return [a for a in lista if isinstance(a, dict)]
 
     def _parsear(self, r: requests.Response) -> RespostaSefin:
         bruto = r.text

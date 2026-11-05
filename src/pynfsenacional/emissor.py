@@ -257,6 +257,22 @@ class Emissor:
         return dfe.sincronizar(self._sefin_client(), self.cfg.prestador.cnpj, nsu,
                                max_paginas=max_paginas)
 
+    def consultar_convenio(self, codigo_municipio: str | None = None) -> dict[str, Any] | None:
+        """Os parâmetros do convênio do município (por padrão, o do prestador) com o
+        ambiente nacional — `aderenteAmbienteNacional == 1` quer dizer que ele emite pela
+        SEFIN Nacional. None se o município não tem convênio."""
+        return self._sefin_client().parametros_convenio(
+            codigo_municipio or self.cfg.prestador.codigo_municipio)
+
+    def consultar_aliquota(self, codigo_servico: str, competencia: str | None = None, *,
+                           codigo_municipio: str | None = None) -> list[dict[str, Any]]:
+        """As alíquotas que o município (por padrão, o do prestador) parametrizou para o
+        `codigo_servico` (`00.00.00.000`) na `competencia` (AAAA-MM-DD; sem ela, o
+        histórico). Lista vazia = o município não administra esse código."""
+        return self._sefin_client().aliquotas(
+            codigo_municipio or self.cfg.prestador.codigo_municipio, codigo_servico,
+            competencia)
+
     # ── internos ──────────────────────────────────────────────────────────────
     def _nota_recuperada(self, idd: str, chave: str | None, xml: str | None) -> Nota:
         logger.info("DPS %s já emitida — recuperada chave=%s (não reemite)", idd, chave)

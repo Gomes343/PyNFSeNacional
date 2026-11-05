@@ -5,6 +5,16 @@ versionamento [SemVer](https://semver.org/lang/pt-BR/).
 
 ## [Não publicado]
 
+## [1.5.0] - 2026-11-05
+
+### Adicionado
+- **Parametrização do município no ADN** (só leitura): `Emissor.consultar_convenio()` diz se o
+  município emite pelo ambiente nacional (`aderenteAmbienteNacional`) e
+  `Emissor.consultar_aliquota(codigo, competencia)` traz as alíquotas que ele parametrizou para o
+  serviço (`00.00.00.000`), ou o histórico sem competência. Também em `SefinClient`
+  (`parametros_convenio`, `aliquotas`). O 404 do ADN vira `None` / lista vazia; outra falha levanta.
+  Regra em `docs/conhecimento-fiscal.md` §21.
+
 ## [1.4.0] - 2026-11-05
 
 ### Adicionado

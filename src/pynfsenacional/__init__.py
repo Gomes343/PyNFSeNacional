@@ -6,6 +6,8 @@ API pública:
     nota = emissor.emitir(valor=Decimal("150.00"), descricao="...", tomador={...})
     nota.danfse("nota.pdf")
     emissor.consultar(chave)                       # a nota (e o XML) pela chave
+    emissor.consultar_convenio()                   # o município emite pelo Nacional?
+    emissor.consultar_aliquota("07.11.01.000")     # alíquotas do serviço no município
     emissor.cancelar(chave, justificativa="...")   # e101101 (ou modo="analise", e101103)
     emissor.sincronizar_dfe(nsu)                   # caixa postal DF-e do CNPJ
 

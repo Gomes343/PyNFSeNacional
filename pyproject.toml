@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "PyNFSeNacionalGT"
-version = "1.4.0"
+version = "1.5.0"
 description = "Emissão, consulta e cancelamento de NFS-e pela API SEFIN Nacional (DPS), caixa postal DF-e e DANFSe local, em Python."
 readme = "README.md"
 requires-python = ">=3.10"

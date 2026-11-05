@@ -736,3 +736,22 @@ também o item cujo ISS é devido no **local do evento** (LC 116/2003, art. 3º)
   logradouro, numero, complemento?, bairro}}`. Vazio = grupo omitido (a DPS de quem não é do item 12
   não muda). O `validar()` acusa o E0390 antes do envio, datas fora do formato, fim antes do início
   e endereço incompleto.
+
+## 21. Parametrização do município no ADN — convênio e alíquotas (só leitura)
+
+Antes de levar um prestador para a API, duas perguntas se respondem pelo ADN, com o certificado de
+qualquer CNPJ (é consulta pública de parâmetros, só GET):
+
+- **O município emite pelo Nacional?** `GET {adn}/parametrizacao/{IBGE}/convenio` →
+  `parametrosConvenio.aderenteAmbienteNacional == 1`. Município sem convênio volta **HTTP 404** com
+  `mensagem` ("Convênio para o município não encontrado").
+- **Qual cTribMun o município administra para o serviço, e com que alíquota?**
+  `GET {adn}/parametrizacao/{IBGE}/{00.00.00.000}/{AAAA-MM-DDT12:00:00}/aliquota` (ou
+  `/historicoaliquotas`, sem competência). O código é **cTribNac (6) + cTribMun (3)** com pontos:
+  `07.11.01.000`. Resposta: `aliquotas[código] = [{Incidencia, Aliq, DtIni, DtFim}]`. Código que o
+  município não administra volta **HTTP 404** ("Alíquotas não encontradas") — é o que antecede o
+  **E0312** na emissão.
+
+Na lib: `Emissor.consultar_convenio()` / `Emissor.consultar_aliquota(codigo, competencia)` (ou
+`SefinClient.parametros_convenio` / `.aliquotas`). O 404 vira `None` / lista vazia; qualquer outro
+status levanta `RuntimeError` — "não deu para saber" nunca vira "não existe".
