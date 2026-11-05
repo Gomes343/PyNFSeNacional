@@ -5,6 +5,15 @@ versionamento [SemVer](https://semver.org/lang/pt-BR/).
 
 ## [Não publicado]
 
+## [1.4.0] - 2026-11-05
+
+### Adicionado
+- **Grupo Atividade/Evento (`atvEvento`)**, obrigatório quando o `cTribNac` é do item 12 da lista
+  (sem ele o SEFIN devolve **E0390**). Opcional por config em `servico.evento` (nome, início, fim e
+  o local: `id` do evento **ou** endereço nacional). O `validar()` acusa o item 12 sem evento, datas
+  inválidas, fim antes do início e endereço incompleto. Sem `evento`, a DPS não muda um byte.
+  Regra em `docs/conhecimento-fiscal.md` §20.
+
 ## [1.3.2] - 2026-11-03
 
 ### Corrigido

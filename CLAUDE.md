@@ -107,6 +107,8 @@ ponta a ponta: **validar → montar DPS → assinar → transporte mTLS → Nota
   e `Emissor.sincronizar_dfe` (`dfe.py`, caixa postal do ADN por NSU). Validados ao vivo em
   homologação. O contador de nDPS deixou de travar no `ja_emitida` (compara valor + tomador da
   nota achada) e o valor passou a `Decimal`. Regra em `docs/conhecimento-fiscal.md` §5, §16–§18.
+- **1.4.0 (05/11/2026) — Atividade/Evento:** `servico.evento` monta o `serv/atvEvento`, obrigatório no
+  item 12 da lista (E0390); `validar_evento` confere antes. Regra em `docs/conhecimento-fiscal.md` §20.
 - **1.3.2 (03/11/2026) — o tomador na conferência do `ja_emitida`:** `mesma_nota` lia o documento do
   tomador em `cpf_cnpj`/`documento` e a DPS em `cpf_cnpj`/`cpf`/`cnpj`; com `cnpj`/`cpf`, a própria nota
   já emitida parecia OUTRA e era reenviada em número novo. Uma leitura só: `dps.documento_tomador`.

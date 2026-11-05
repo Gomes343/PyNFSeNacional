@@ -722,3 +722,17 @@ o cancelamento da §16 vale nos dois.
 **Validado ao vivo em homologação (31/10/2026)**, ME/EPP do Rio de Janeiro: a DPS sem o grupo
 IBS/CBS autorizada no leiaute novo (o E1235 sumiu), e com o grupo também (§8). As duas canceladas.
 
+## 20. Atividade/Evento (`atvEvento`) — obrigatório no item 12 da lista
+
+O `cTribNac` do **item 12** da lista de serviços (diversões, lazer, entretenimento, competições
+esportivas…) exige o grupo `serv/atvEvento` (`TCAtvEvento`); sem ele o SEFIN devolve **E0390**. É
+também o item cujo ISS é devido no **local do evento** (LC 116/2003, art. 3º).
+
+- Posição: dentro de `<serv>`, depois de `comExt`/`obra` e antes de `explRod`/`infoCompl`.
+- Filhos: `xNome` (1-255) → `dtIni` → `dtFim` (`TSData`, AAAA-MM-DD) → **um dos dois**:
+  `idAtvEvt` (identificação que o município dá ao evento) **ou** `end` (`TCEnderecoSimples`:
+  `CEP` → `xLgr` → `nro` → `xCpl?` → `xBairro`, endereço nacional).
+- Na lib: `servico.evento` = `{nome, inicio, fim, id}` ou `{nome, inicio, fim, endereco: {cep,
+  logradouro, numero, complemento?, bairro}}`. Vazio = grupo omitido (a DPS de quem não é do item 12
+  não muda). O `validar()` acusa o E0390 antes do envio, datas fora do formato, fim antes do início
+  e endereço incompleto.
