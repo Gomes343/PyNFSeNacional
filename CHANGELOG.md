@@ -19,7 +19,8 @@ pacote passa a instalar uma pilha que assina em qualquer piso declarado.
   falha de rede. Sem retentativa automática.
 - **E0840 no cancelamento direto** ("o evento de Cancelamento já está vinculado à NFS-e", a 2ª
   tentativa depois de uma resposta perdida) vira `ok=True`, `cancelada=True`,
-  `ja_estava_cancelada=True` no `Emissor.cancelar`. `RespostaEvento.ja_vinculado` expõe o E0840 a
+  `ja_estava_cancelada=True` e `desfecho="registrado"` (o evento ESTÁ na nota; o `E0840` fica em
+  `erro_codigo`) no `Emissor.cancelar`. `RespostaEvento.ja_vinculado` expõe o E0840 a
   quem usa o `SefinClient` direto.
 - **O cancelamento tem teto de relógio:** `Emissor.cancelar(..., prazo_s=90)`; estourado, é
   ambíguo. Sem ele, uma resposta que goteja prendia a chamada, porque o `timeout` vale entre bytes.
@@ -77,6 +78,15 @@ pacote passa a instalar uma pilha que assina em qualquer piso declarado.
 - `dfe.decodificar_xml`.
 
 ### Mudou
+- ⚠️ **Comportamento que muda para quem já usa a 1.6.0** (cada um está descrito em "Corrigido"):
+  - `SefinClient.registrar_evento` não levanta mais `requests.RequestException`: devolve
+    `ok=False` com `desfecho` `nao_enviado` ou `ambiguo`. Quem tratava a exceção passa a ler o
+    `desfecho`.
+  - `eventos.montar_cancelamento` e `Emissor.cancelar` recusam por padrão (`ConfigError`, antes de
+    assinar) a chave cujo emitente não é o autor. Pedido por procuração: `conferir_emitente=False`
+    (nos dois).
+  - `parametros_convenio`/`aliquotas` levantam `ValueError` para entrada fora do formato e
+    `RuntimeError` para 404 sem a resposta do ADN ou corpo não-JSON (antes, `None`/`[]`).
 - **Pisos de dependência** que de fato assinam: `signxml>=4` (declarado), `cryptography>=43`,
   `lxml>=5.2.1`, `erpbrasil.assinatura>=1.8.0`. Com os pisos antigos o resolvedor montava signxml
   3.2.2 + pyOpenSSL novo, e a suíte dava 11 falhas. O CI ganhou a célula **mínimas**

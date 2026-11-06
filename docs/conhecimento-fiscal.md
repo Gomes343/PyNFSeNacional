@@ -662,13 +662,14 @@ que cancela em produção): `Id = "PRE" + chave + tipo do evento`; `tpAmb` → `
   o limite que a SEFIN aplica de fato não foi medido ao vivo (uma recusa acima de 200 viria como
   E-code, sem nota cancelada à toa).
 - **O autor é o emitente.** A chave traz o CNPJ/CPF de quem emitiu (§17): a lib recusa, antes de
-  assinar, o cancelamento de uma chave de OUTRO emitente (`montar_cancelamento(...,
-  conferir_emitente=False)` desliga, para quem pede por procuração).
+  assinar, o cancelamento de uma chave de OUTRO emitente (`conferir_emitente=False`, no
+  `montar_cancelamento` e no `Emissor.cancelar`, desliga, para quem pede por procuração — se a
+  SEFIN aceita o pedido por procuração não foi medido).
 - `dhEvento` leva o mesmo recuo do `dhEmi` (§4, E0008).
 - Cancelar de novo uma nota já cancelada volta **E0840** ("o evento de Cancelamento já está
   vinculado à NFS-e") — medido em homologação. No **direto**, o `Emissor.cancelar` lê o E0840 como
-  a nota que JÁ estava cancelada (`ok`, `cancelada`, `ja_estava_cancelada`): é o que acontece na
-  2ª tentativa depois de uma resposta perdida.
+  a nota que JÁ estava cancelada (`ok`, `cancelada`, `ja_estava_cancelada`, `desfecho=registrado`):
+  é o que acontece na 2ª tentativa depois de uma resposta perdida.
 - ☠️ **O ambíguo não é "falhou".** O pedido é UM POST, sem retentativa. Tempo esgotado depois do
   envio, conexão caída no meio, 5xx sem corpo, 2xx sem o evento: a SEFIN **pode** ter registrado.
   `RespostaEvento.desfecho` separa `registrado` · `recusado` (a SEFIN respondeu e não registrou) ·

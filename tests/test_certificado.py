@@ -114,6 +114,25 @@ def test_cpf_so_na_san_de_pessoa_fisica(tmp_path):
     assert cert.documento == "11144477735" and cert.tipo_documento == "CPF"
 
 
+def test_san_com_cnpj_e_cpf_juntos_e_e_cnpj(tmp_path):
+    """O e-CNPJ ICP-Brasil traz na SAN o CNPJ (3.3) E os dados do responsável (3.4, e às vezes
+    3.1 com o CPF dele): a empresa é o CNPJ, nunca o CPF do responsável."""
+    from conftest import san_icp
+    cert = _abrir(tmp_path, cn="EMPRESA FICTICIA LTDA",
+                  san=[san_icp("2.16.76.1.3.1", "01011980" + "11144477735" + "0" * 11),
+                       san_icp("2.16.76.1.3.3", "11222333000181")])
+    assert cert.documento == "11222333000181" and cert.tipo_documento == "CNPJ"
+
+
+def test_cpf_zerado_na_san_nao_e_documento(tmp_path):
+    """Campo ausente vem preenchido de zeros (DOC-ICP-04): 000.000.000-00 passa no DV, mas
+    não é o CPF de ninguém."""
+    from conftest import san_icp
+    cert = _abrir(tmp_path, cn="FULANO DE TAL",
+                  san=[san_icp("2.16.76.1.3.1", "01011980" + "0" * 11 + "0" * 11)])
+    assert cert.documento is None and cert.tipo_documento is None
+
+
 def test_der_conteudo_tolera_lixo():
     from pynfsenacional.certificado import _der_conteudo
     assert _der_conteudo(b"") is None and _der_conteudo(b"\x04\x09abc") is None

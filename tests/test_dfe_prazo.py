@@ -75,6 +75,18 @@ def test_prazo_nao_comeca_espera_de_429_que_nao_cabe():
     r = dfe.sincronizar(adn, "11222333000181", 7, prazo_s=5, dormir=rel.dormir, relogio=rel)
     # 1ª espera 3 s cabe (resta 4,5); a 2ª, de 6 s, não
     assert r.prazo_esgotado and r.ultimo_nsu == 7 and len(adn.pedidos) == 2
+    # e não DORMIU a espera que não cabia: o relógio não passa do prazo
+    assert rel.t <= 5
+
+
+def test_prazo_nao_comeca_pausa_que_nao_cabe():
+    rel = Relogio()
+    adn = AdnLento([_pag(1), _pag(2)], rel, custo=3.0)
+    r = dfe.sincronizar(adn, "11222333000181", 0, prazo_s=7, pausa_s=5, dormir=rel.dormir,
+                        relogio=rel, max_paginas=100)
+    # 3 s da página + 5 s de pausa passariam dos 7: para ANTES de dormir
+    assert r.prazo_esgotado and r.ultimo_nsu == 1 and len(adn.pedidos) == 1
+    assert rel.t <= 7
 
 
 def test_requisicao_que_estoura_o_prazo_e_prazo_nao_erro():

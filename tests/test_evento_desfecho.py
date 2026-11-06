@@ -179,6 +179,12 @@ def test_emitente_da_chave():
     assert chave.emitente_da_chave(CHAVE[:8] + "9" + CHAVE[9:]) is None    # tpInsc desconhecido
     alfa = CHAVE[:9] + "12ABC34501DE35" + CHAVE[23:]
     assert chave.emitente_da_chave(alfa) == "12ABC34501DE35"
+    # CPF fora do layout esperado (sem os 3 zeros à esquerda): não sei → None, e nada se
+    # recusa por isso (o lado seguro enquanto o layout do CPF não foi medido)
+    cpf_estranho = CHAVE[:8] + "1" + "12311144477735" + CHAVE[23:]
+    assert chave.emitente_da_chave(cpf_estranho) is None
+    assert chave.chave_do_emitente(cpf_estranho, "11144477735") is None
+    assert chave.chave_do_emitente(cpf_estranho, "12311144477735") is None
 
 
 def test_chave_do_emitente():

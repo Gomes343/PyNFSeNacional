@@ -310,13 +310,15 @@ def test_cancelar_e0840_no_direto_e_nota_ja_cancelada(emissor, monkeypatch):
     """A 2ª tentativa depois de uma resposta perdida volta E0840 ("já vinculado"): a nota
     ESTÁ cancelada. Até a 1.6.0 isso saía como falha — e a nota seguia "válida" para quem
     chamou."""
-    from pynfsenacional.sefin import RECUSADO
+    from pynfsenacional.sefin import REGISTRADO
     fake = FakeSefin(evento=RespostaEvento(
         ok=False, erro_codigo="E0840", erro_msg="já vinculado",
         erros=[{"codigo": "E0840", "descricao": "já vinculado", "complemento": None}]))
     monkeypatch.setattr(emissor, "_sefin_client", lambda: fake)
     r = emissor.cancelar(CHAVE, justificativa=JUST)
-    assert r.ok and r.cancelada and r.ja_estava_cancelada and r.desfecho == RECUSADO
+    # quem decide pelo `desfecho` não pode ler "recusado" numa nota cancelada
+    assert r.ok and r.cancelada and r.ja_estava_cancelada and r.desfecho == REGISTRADO
+    assert not r.ambiguo and r.erro_codigo == "E0840"
 
 
 def test_cancelar_e0840_na_analise_nao_vira_cancelada(emissor, monkeypatch):
@@ -352,6 +354,16 @@ def test_cancelar_chave_de_outro_prestador_nao_toca_a_rede(emissor, monkeypatch)
     with pytest.raises(ConfigError, match="outro emitente"):
         emissor.cancelar(outra, justificativa=JUST)
     assert fake.evento_enviado is None
+
+
+def test_cancelar_por_procuracao_desliga_a_conferencia_do_emitente(emissor, monkeypatch):
+    """A recusa da chave alheia é o padrão; quem pede por procuração (autor ≠ emitente)
+    desliga pelo Emissor, como já podia no `montar_cancelamento`."""
+    fake = FakeSefin(evento=RespostaEvento(ok=True, evento_xml="<e/>"))
+    monkeypatch.setattr(emissor, "_sefin_client", lambda: fake)
+    outra = CHAVE[:9] + "99888777000166" + CHAVE[23:]
+    r = emissor.cancelar(outra, justificativa=JUST, conferir_emitente=False)
+    assert r.ok and fake.evento_enviado is not None
 
 
 # ── parametrização pelo Emissor ──────────────────────────────────────────────

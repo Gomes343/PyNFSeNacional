@@ -79,7 +79,8 @@ class ResultadoEvento:
     erro_codigo: str | None = None
     erro_msg: str | None = None
     erros: list[dict[str, str | None]] = field(default_factory=list)
-    # o que aconteceu com o pedido: sefin.REGISTRADO | RECUSADO | NAO_ENVIADO | AMBIGUO
+    # o que aconteceu com o pedido: sefin.REGISTRADO | RECUSADO | NAO_ENVIADO | AMBIGUO.
+    # O E0840 do direto é REGISTRADO: o evento já está na nota (`ja_estava_cancelada`).
     desfecho: str = sefin.RECUSADO
     # direto que voltou E0840 ("o evento de Cancelamento já está vinculado à NFS-e"): a nota
     # JÁ estava cancelada — típico da 2ª tentativa depois de uma resposta perdida.
@@ -242,7 +243,8 @@ class Emissor:
 
     def cancelar(self, chave: str, *, justificativa: str, motivo: int = 1,
                  modo: str = "direto",
-                 prazo_s: float | None = PRAZO_CANCELAMENTO_S) -> ResultadoEvento:
+                 prazo_s: float | None = PRAZO_CANCELAMENTO_S,
+                 conferir_emitente: bool = True) -> ResultadoEvento:
         """Cancela a NFS-e (`modo="direto"`, e101101) ou pede a análise fiscal do
         cancelamento (`modo="analise"`, e101103 — para municípios que não aceitam o direto).
 
@@ -254,13 +256,18 @@ class Emissor:
         (`RECUSADO`), o que nem saiu (`NAO_ENVIADO`) e o que saiu sem resposta (`AMBIGUO`,
         também quando passa de `prazo_s` segundos de relógio): no ambíguo, CONFIRA a nota
         antes de repetir. No direto, o E0840 ("já vinculado") é a nota que JÁ estava
-        cancelada: `ok=True`, `cancelada=True`, `ja_estava_cancelada=True`."""
+        cancelada: `ok=True`, `cancelada=True`, `ja_estava_cancelada=True` e
+        `desfecho=REGISTRADO` (o evento ESTÁ registrado; o código fica em `erro_codigo`).
+
+        `conferir_emitente=False` aceita a chave de outro emitente (pedido por procuração,
+        autor ≠ emitente) — se a SEFIN aceita, decide ela."""
         if self.ambiente not in ("homologacao", "producao"):
             raise ConfigError(f"ambiente inválido: {self.ambiente!r}")
         ch = _chave.limpar(chave)
         xml = eventos.montar_cancelamento(
             chave=ch, autor=self.cfg.prestador.cnpj, motivo=motivo,
             justificativa=justificativa, ambiente=self.ambiente, modo=modo,
+            conferir_emitente=conferir_emitente,
         )
         assinado = assinatura.assinar_xml(xml, "infPedReg", pkcs12_data=self._pkcs12(),
                                           senha=self.cfg.certificado.senha)
@@ -274,7 +281,8 @@ class Emissor:
             logger.info("cancelamento: a nota já estava cancelada (E0840)")
             return ResultadoEvento(ok=True, chave_acesso=ch, modo=modo, cancelada=True,
                                    ja_estava_cancelada=True, erro_codigo=r.erro_codigo,
-                                   erro_msg=erro_msg, erros=r.erros, desfecho=r.desfecho)
+                                   erro_msg=erro_msg, erros=r.erros,
+                                   desfecho=sefin.REGISTRADO)
         if not r.ok:
             logger.warning("evento %s: [%s] %s", r.desfecho, r.erro_codigo, r.erro_msg)
         return ResultadoEvento(
