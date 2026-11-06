@@ -80,11 +80,11 @@ def _regular(**servico: Any) -> dict[str, Any]:
 # do Anexo VIII para "demais serviços" (01.01: NBS 1.1502.10.00, cIndOp 100301).
 IBSCBS_SIMPLES = {"cIndOp": "100301", "CST": "000", "cClassTrib": "000001", "indFinal": "0"}
 
-EVENTO_ENDERECO = {"nome": "Arbitragem de FUTSAL", "inicio": "2026-11-04", "fim": "2026-11-04",
+EVENTO_ENDERECO = {"nome": "Torneio de exemplo", "inicio": "2026-11-04", "fim": "2026-11-04",
                    "endereco": {"cep": "01310-100", "logradouro": "AVENIDA PAULISTA",
                                 "numero": "1000", "complemento": "SALA 1", "bairro": "BELA VISTA"}}
 EVENTO_ID = {"nome": "Campeonato de teste", "inicio": "2026-10-01", "fim": "2026-10-31",
-             "id": "256277"}
+             "id": "EVT-0001"}
 
 CONFIGS = {
     "simples": _simples(),

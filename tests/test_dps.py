@@ -265,9 +265,10 @@ def test_endereco_incompleto_do_tomador_avisa_no_log(caplog):
 
 # ── Grupo Atividade/Evento (item 12 da lista; E0390 sem ele) ────────────────────────────────
 
-_EVENTO = {"nome": "Arbitragem de FUTSAL", "inicio": "2026-11-04", "fim": "2026-11-04",
-           "endereco": {"cep": "12630-000", "logradouro": "CORONEL DOMICIANO", "numero": "92",
-                        "complemento": "PREDIO", "bairro": "CENTRO"}}
+# Dados FICTÍCIOS (endereço genérico de exemplo; nenhum evento real).
+_EVENTO = {"nome": "Torneio de exemplo", "inicio": "2026-11-04", "fim": "2026-11-04",
+           "endereco": {"cep": "01310-100", "logradouro": "AVENIDA PAULISTA", "numero": "1000",
+                        "complemento": "SALA 1", "bairro": "BELA VISTA"}}
 
 
 def _cfg_evento(**ev):
@@ -286,12 +287,12 @@ def test_evento_vai_entre_cserv_e_infocompl_com_o_endereco():
     assert [etree.QName(c).localname for c in atv] == ["xNome", "dtIni", "dtFim", "end"]
     assert [etree.QName(c).localname for c in atv.find(f"{{{NS}}}end")] == [
         "CEP", "xLgr", "nro", "xCpl", "xBairro"]
-    assert _txt(inf, "serv/atvEvento/end/CEP") == "12630000"
+    assert _txt(inf, "serv/atvEvento/end/CEP") == "01310100"
     assert _txt(inf, "serv/atvEvento/dtIni") == "2026-11-04"
 
 
 def test_evento_com_id_nao_leva_endereco():
-    inf = _inf(_montar(_cfg_evento(id="256277")))
+    inf = _inf(_montar(_cfg_evento(id="EVT-0001")))
     atv = inf.find(f"{{{NS}}}serv/{{{NS}}}atvEvento")
     assert [etree.QName(c).localname for c in atv] == ["xNome", "dtIni", "dtFim", "idAtvEvt"]
 
