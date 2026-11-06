@@ -609,9 +609,12 @@ Quem decide é o regime, o convênio do município de incidência e a retenção
 | ME/EPP, ISS fora do SN (`regApTribSN` 2/3) | ativo | — | proibido (E0635) |
 | ME/EPP, ISS fora do SN | não ativo | — | obrigatório (E0640) |
 
-Esta biblioteca **não emite `pAliq`**: ela cobre o Não Optante em município com convênio ativo
-(retido ou não) e o ME/EPP sem retenção. O ME/EPP com ISS **retido** precisaria da alíquota — o
-validador recusa essa config (E0621) em vez de deixar a DPS ir para a rejeição.
+Desde a 1.6.0 a biblioteca **emite `pAliq` quando a config informa** (`servico.tributos.pAliq`,
+o ÚLTIMO filho do `tribMun`, depois de `tpRetISSQN`; `TSDec1V2`, ex. `2.01`). Sem o campo, nada
+muda. O validador cobre a linha do ME/EPP com ISS pelo SN: retido **sem** `pAliq` = E0621, abaixo
+de 1,8% = E0628, `pAliq` **sem** retenção = E0625; e qualquer `pAliq` acima de 5% (teto do ISS,
+LC 116/2003, art. 8º, II). As linhas que dependem do convênio do município (E0617/E0619/E0635/
+E0640) ficam com quem chama — o convênio se consulta com `Emissor.consultar_convenio()` (§21).
 
 ### Na NFS-e
 

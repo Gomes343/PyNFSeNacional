@@ -95,6 +95,9 @@ CONFIGS = {
     "regular_sem_indfinal": _regular(ibscbs={"cIndOp": "050101", "CST": "000",
                                              "cClassTrib": "000001"}),
     "regular_retido": _regular(tributos={"tpRetISSQN": 2}),
+    # ME/EPP com o ISS pelo Simples e ISS retido: a alíquota do município vai no tribMun (§15).
+    "simples_retido_paliq": _simples(tributos={"pTotTribSN": "6.00", "tpRetISSQN": 2,
+                                               "pAliq": "2.01"}),
     # Item 12 (competições esportivas): grupo Atividade/Evento, local por endereço ou por id.
     "simples_evento_endereco": _simples(cTribNac="121101", cTribMun="", evento=EVENTO_ENDERECO),
     "simples_evento_id": _simples(cTribNac="121101", cTribMun="", evento=EVENTO_ID,

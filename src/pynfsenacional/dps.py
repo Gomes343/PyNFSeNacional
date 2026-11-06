@@ -292,6 +292,11 @@ def montar_dps(
     tm = _el(trib, "tribMun")
     _el(tm, "tribISSQN", str(s.tributos.get("tribISSQN", 1)))
     _el(tm, "tpRetISSQN", str(s.tributos.get("tpRetISSQN", 1)))
+    # pAliq (opt-in): ME/EPP com ISS pelo Simples e ISS RETIDO exige a alíquota do município na DPS
+    # (E0621/E0628). Só vai quando o chamador a informa em `tributos.pAliq`; é o último filho do
+    # tribMun (depois de tpRetISSQN).
+    if s.tributos.get("pAliq") not in (None, ""):
+        _el(tm, "pAliq", str(valor_decimal(s.tributos["pAliq"])))
     # tribFed (PIS/COFINS): PROIBIDO para o MEI — E0676 ("não é permitido preencher os tributos
     # federais quando o emitente é MEI"). O MEI recolhe tudo no DAS-SIMEI. Só ME/EPP e Não Optante
     # enviam tribFed. (tribFed é minOccurs=0 no XSD; a nota real do MEI no EmissorWeb sai sem ele.)

@@ -5,6 +5,15 @@ versionamento [SemVer](https://semver.org/lang/pt-BR/).
 
 ## [Não publicado]
 
+## [1.6.0] - 2026-11-05
+
+### Adicionado
+- **`pAliq` — a alíquota do ISS na DPS** (`servico.tributos.pAliq`), o que o ME/EPP com o ISS pelo
+  Simples precisa quando o ISS é **retido** pelo tomador. Vai como último filho do `tribMun`; sem o
+  campo, a DPS não muda um byte. O `validar()` acusa antes do envio: retido sem `pAliq` (E0621),
+  abaixo de 1,8% (E0628), `pAliq` sem retenção (E0625) e acima do teto de 5% do ISS.
+  Regra em `docs/conhecimento-fiscal.md` §15.
+
 ## [1.5.0] - 2026-11-05
 
 ### Adicionado

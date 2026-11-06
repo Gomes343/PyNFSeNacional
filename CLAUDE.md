@@ -107,6 +107,8 @@ ponta a ponta: **validar → montar DPS → assinar → transporte mTLS → Nota
   e `Emissor.sincronizar_dfe` (`dfe.py`, caixa postal do ADN por NSU). Validados ao vivo em
   homologação. O contador de nDPS deixou de travar no `ja_emitida` (compara valor + tomador da
   nota achada) e o valor passou a `Decimal`. Regra em `docs/conhecimento-fiscal.md` §5, §16–§18.
+- **1.6.0 (05/11/2026) — `pAliq`:** a alíquota do ISS retido do ME/EPP (E0621/E0628/E0625, teto 5%),
+  último filho do `tribMun`; sem o campo a DPS não muda. Regra em `docs/conhecimento-fiscal.md` §15.
 - **1.5.0 (05/11/2026) — parametrização do município:** `Emissor.consultar_convenio` e
   `Emissor.consultar_aliquota` (ADN, só GET; 404 = não há). Regra em `docs/conhecimento-fiscal.md` §21.
 - **1.4.0 (05/11/2026) — Atividade/Evento:** `servico.evento` monta o `serv/atvEvento`, obrigatório no
@@ -139,7 +141,7 @@ pyproject deles parece engano) só entra para gerar o PDF. Import lazy em `danfs
 release por tag `vX.Y.Z` (PyPI via Trusted Publishing + Release do GitHub, sem token no repo).
 **Em aberto:** (1) endurecimento a partir de mais emissões reais; (2) grupo IBS/CBS do **Simples**
 (01/01/2027): faltam `regApIBSCBSSN`/`cAtvSN` da NT 009, que o esquema ainda não tem, e os casos não
-cobertos do grupo; `pAliq`; (3) reportar o classifier de licença errado upstream; (4) trocar o
+cobertos do grupo; (3) reportar o classifier de licença errado upstream; (4) trocar o
 leiaute padrão da produção quando ela virar para o pacote da NT 009; (5) evento de substituição.
 
 Tooling: `pip install -e ".[dev]"` (deps instalam no 3.10–3.14), lock com hashes

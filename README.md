@@ -83,11 +83,11 @@ pip install "PyNFSeNacionalGT[danfse]"
 
 > Requer **Python 3.10+**. No PyPI o pacote se chama **`PyNFSeNacionalGT`** (o nome `PyNFSeNacional`
 > esbarra na proteção do PyPI por semelhança com outro projeto); o **import continua `pynfsenacional`**.
-> Pin recomendado: **`PyNFSeNacionalGT>=1.5.0`** — a 1.2.0 corrige o contador de nDPS que travava
+> Pin recomendado: **`PyNFSeNacionalGT>=1.6.0`** — a 1.2.0 corrige o contador de nDPS que travava
 > depois de uma resposta perdida (toda emissão seguinte voltava "já emitida") e traz cancelamento,
 > consulta pela chave e a caixa postal DF-e; a 1.3.1 faz a caixa DF-e distinguir a RECUSA (ex.:
 > consulta por procuração sem a procuração, E2245) de uma caixa vazia; a 1.3.2 faz a conferência do `ja_emitida` ler o tomador
-> como a DPS o escreve (`cnpj`/`cpf`), sem reenviar a própria nota em número novo; a 1.4.0 traz o grupo Atividade/Evento, obrigatório no item 12 (E0390); a 1.5.0 consulta o convênio e as alíquotas do município. O histórico de cada versão está no [CHANGELOG](CHANGELOG.md).
+> como a DPS o escreve (`cnpj`/`cpf`), sem reenviar a própria nota em número novo; a 1.4.0 traz o grupo Atividade/Evento, obrigatório no item 12 (E0390); a 1.5.0 consulta o convênio e as alíquotas do município; a 1.6.0 emite o `pAliq` do ISS retido do ME/EPP. O histórico de cada versão está no [CHANGELOG](CHANGELOG.md).
 
 ---
 
@@ -292,7 +292,7 @@ config (JSON)  →  montar DPS (XML)  →  assinar (XMLDSIG)  →  gzip+base64 �
 - ⏳ Os campos do Simples da NT 009 (`regApIBSCBSSN`, `cAtvSN`) quando entrarem no esquema; o grupo
   IBS/CBS do Simples é obrigatório a partir de 01/01/2027 (Ato Conjunto RFB/CGIBS nº 4/2026). E os
   casos ainda não cobertos do grupo: destinatário ≠ adquirente, compra governamental
-- ⏳ Tomador estrangeiro / sem documento; `pAliq` (ISS retido de ME/EPP, município não conveniado)
+- ⏳ Tomador estrangeiro / sem documento
 - ✅ **Cancelamento** (e101101 direto / e101103 análise fiscal), **consulta pela chave** e
   **distribuição DF-e** por NSU; valor em `Decimal`; certificado do servidor conferido — v1.2.0
 - ⏳ Evento de **substituição** (e105102) e manifestação do tomador

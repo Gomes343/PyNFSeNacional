@@ -330,10 +330,28 @@ class ClienteConfig:
                     "tem retenção do ISSQN — use tpRetISSQN=1"
                 )
             if r.opSimpNac == 3 and r.regApTribSN == 1:
-                problemas.append(
-                    "E0621: ME/EPP com o ISS pelo Simples e ISS RETIDO exige a alíquota (pAliq) "
-                    "na DPS, que esta biblioteca ainda não emite (§15)"
-                )
+                if t.get("pAliq") in (None, ""):
+                    problemas.append(
+                        "E0621: ME/EPP com o ISS pelo Simples e ISS RETIDO exige a alíquota "
+                        "(pAliq) na DPS: informe servico.tributos.pAliq (alíquota do "
+                        "município, §15)"
+                    )
+        if t.get("pAliq") not in (None, ""):
+            try:
+                aliq = float(str(t["pAliq"]).replace(",", "."))
+            except ValueError:
+                problemas.append(f"servico.tributos.pAliq não é numérico: {t['pAliq']!r}")
+            else:
+                if r.opSimpNac == 3 and r.regApTribSN == 1 and ret != "2":
+                    problemas.append(
+                        "E0625: ME/EPP com o ISS pelo Simples SEM retenção não informa a "
+                        "alíquota — tire servico.tributos.pAliq (§15)"
+                    )
+                elif r.opSimpNac == 3 and r.regApTribSN == 1 and aliq < 1.8:
+                    problemas.append("E0628: pAliq abaixo do mínimo de 1,8% (§15)")
+                if aliq > 5:
+                    problemas.append("pAliq acima do máximo de 5% do ISS "
+                                     "(LC 116/2003, art. 8º, II — §15)")
 
         # tribFed/piscofins (§12) — o MEI não emite tribFed (E0676), então não se aplica.
         if r.opSimpNac != 2:
