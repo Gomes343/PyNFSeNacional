@@ -17,17 +17,14 @@ docs/conhecimento-fiscal.md para a regra fiscal (DPS, E-codes, numeração, DANF
 
 from __future__ import annotations
 
-from importlib.metadata import PackageNotFoundError, version
-
 from .config import ClienteConfig, ConfigError
 from .dfe import DocumentoDfe, RespostaDfe
 from .emissor import Emissor, Nota, ResultadoEvento
 
-try:
-    # Fonte única da versão: o metadado do pacote instalado (pyproject.toml).
-    __version__ = version("PyNFSeNacionalGT")
-except PackageNotFoundError:  # pragma: no cover - rodando do source, sem instalar
-    __version__ = "0.0.0+unknown"
+#: Fonte única da versão (o pyproject a lê daqui, por `[tool.hatch.version]`). Até a 1.6.0 ela
+#: vinha do metadado instalado — e uma instalação EDITÁVEL feita na 1.0.0 seguia dizendo 1.0.0
+#: enquanto rodava o código novo.
+__version__ = "1.7.0"
 
 __all__ = ["Emissor", "Nota", "ResultadoEvento", "ClienteConfig", "ConfigError",
            "DocumentoDfe", "RespostaDfe", "__version__"]

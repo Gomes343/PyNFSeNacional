@@ -4,7 +4,9 @@ build-backend = "hatchling.build"
 
 [project]
 name = "PyNFSeNacionalGT"
-version = "1.6.0"
+# A versão mora em src/pynfsenacional/__init__.py (`__version__`), lida pelo hatch: uma
+# instalação editável antiga diz a versão do CÓDIGO, não a do metadado que gravou.
+dynamic = ["version"]
 description = "Emissão, consulta e cancelamento de NFS-e pela API SEFIN Nacional (DPS), caixa postal DF-e e DANFSe local, em Python."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -31,16 +33,25 @@ classifiers = [
 # Dependências — a estratégia é INTEGRAR libs maduras do ecossistema fiscal Python,
 # não reimplementar criptografia. Ver docs/roadmap.md (mapa peça → biblioteca).
 dependencies = [
-    "lxml>=4.9",                    # montagem/serialização do XML da DPS + canonicalização C14N do infDPS
+    # Pisos medidos: abaixo deles o resolvedor monta uma pilha que NÃO assina. Com
+    # cryptography 42 ou lxml 4.9 ele caía no signxml 3.2.2 (pyOpenSSL) com um pyOpenSSL
+    # novo — a suíte dava 11 falhas (golden, emissão, cancelamento). O signxml >= 4 não usa
+    # pyOpenSSL e pede cryptography >= 43 e lxml >= 5.2.1. A célula "mínimas" do CI instala
+    # exatamente estes pisos.
+    "lxml>=5.2.1",                  # montagem/serialização do XML da DPS + canonicalização C14N do infDPS
     # assinatura XMLDSIG do DPS (assina_xml2 por Id; a peça que era o "nó").
     # != 1.8.1: ela pôs teto signxml<4 + pyOpenSSL<24.3 (para o Odoo), o que força cryptography<44
     # e lxml<6 — e no Python 3.14 o lxml 5.x não tem wheel: a instalação quebra. Para a DPS a
     # Signature é filha do <DPS> (não do elemento assinado), então o signxml 5 é seguro aqui —
     # tests/test_golden.py confere posição, namespace, DigestValue e verificação.
-    "erpbrasil.assinatura>=1.7,!=1.8.1",
-    "cryptography>=42",             # leitura do certificado A1 .pfx (PKCS#12, cifras legadas ICP-Brasil)
+    "erpbrasil.assinatura>=1.8.0,!=1.8.1",
+    "signxml>=4",                   # o motor do erpbrasil; declarado para não cair no 3.x (pyOpenSSL)
+    "cryptography>=43",             # leitura do certificado A1 .pfx (PKCS#12, cifras legadas ICP-Brasil)
     "requests>=2.31",               # transporte mTLS ao SEFIN (gzip + base64)
     "requests-pkcs12>=1.25",        # mTLS com o .pfx DIRETO (PKCS#12), como o cURL P12 do PHP
+    # base de fusos no Windows (lá o zoneinfo não tem a do sistema); sem ela o relógio cai
+    # no UTC-3 fixo, que hoje é o mesmo fuso
+    "tzdata; sys_platform == 'win32'",
 ]
 
 [project.optional-dependencies]
@@ -59,8 +70,16 @@ Issues = "https://github.com/Gomes343/PyNFSeNacional/issues"
 [project.scripts]
 nfse-nacional = "pynfsenacional.cli:main"
 
+[tool.hatch.version]
+path = "src/pynfsenacional/__init__.py"
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/pynfsenacional"]
+
+# O sdist leva só o que é do pacote (até a 1.6.0 levava tudo o que está no git: testes,
+# CLAUDE.md, .github/, docs/).
+[tool.hatch.build.targets.sdist]
+only-include = ["src/pynfsenacional", "README.md", "LICENSE", "CHANGELOG.md"]
 
 [tool.ruff]
 line-length = 100

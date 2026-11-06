@@ -30,11 +30,22 @@ Formato de `dh_emi`: ISO 8601 com offset, igual ao `date('c')` da referência PH
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
-from zoneinfo import ZoneInfo
+from datetime import datetime, timedelta, timezone, tzinfo
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
+
+def _fuso_brasilia() -> tzinfo:
+    """America/Sao_Paulo da base de fusos; sem a base (Windows sem o pacote `tzdata`), UTC-3
+    fixo — que é o mesmo fuso desde 2019, quando o horário de verão acabou. Até a 1.6.0, sem a
+    base, `import pynfsenacional` levantava `ZoneInfoNotFoundError`."""
+    try:
+        return ZoneInfo("America/Sao_Paulo")
+    except (ZoneInfoNotFoundError, ValueError):
+        return timezone(timedelta(hours=-3), "America/Sao_Paulo")
+
 
 #: Fuso oficial do SEFIN Nacional (horário de Brasília).
-FUSO_BRASILIA = ZoneInfo("America/Sao_Paulo")
+FUSO_BRASILIA = _fuso_brasilia()
 
 #: Segundos de recuo do `dhEmi` para não empatar com o relógio do SEFIN (E0008).
 #: 5s cobre com folga o espalhamento medido no pool deles (~0 a ~1s) e é fiscalmente

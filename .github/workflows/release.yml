@@ -1,7 +1,9 @@
 name: Release
 
-# Ao empurrar uma tag vX.Y.Z: publica no PyPI (Trusted Publishing/OIDC — sem token/segredo
-# no repo; configurar o publisher confiável no PyPI antes) E cria a Release no GitHub.
+# Ao empurrar uma tag vX.Y.Z: roda a suíte (o próprio ci.yml), confere que a tag está no main
+# e bate com a versão do pacote, e SÓ ENTÃO publica no PyPI (Trusted Publishing/OIDC — sem
+# token no repo) e cria a Release no GitHub. Até a 1.6.0 o gatilho era só a tag: a 0.4.0 subiu
+# com o CI vermelho e a 1.2.1 saiu de um commit fora do main, sem teste nenhum.
 on:
   push:
     tags: ["v*"]
@@ -10,8 +12,42 @@ permissions:
   contents: read
 
 jobs:
-  build-publish:
+  ci:
+    uses: ./.github/workflows/ci.yml
+
+  conferir:
     runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0             # o histórico inteiro, para o merge-base com o main
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: A tag está no main
+        run: |
+          git fetch --no-tags origin main
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/main \
+            || { echo "::error::a tag ${GITHUB_REF_NAME} não aponta para um commit do main"; exit 1; }
+      - name: A tag bate com a versão do pacote e com o CHANGELOG
+        run: |
+          python - <<'PY'
+          import os, re, sys
+          tag = os.environ["GITHUB_REF_NAME"]
+          src = open("src/pynfsenacional/__init__.py", encoding="utf-8").read()
+          versao = re.search(r'^__version__ = "([^"]+)"', src, re.M).group(1)
+          if tag != f"v{versao}":
+              sys.exit(f"::error::tag {tag} ≠ __version__ {versao}")
+          if f"## [{versao}]" not in open("CHANGELOG.md", encoding="utf-8").read():
+              sys.exit(f"::error::CHANGELOG.md sem a entrada [{versao}]")
+          print(f"ok: {tag}")
+          PY
+
+  build-publish:
+    needs: [ci, conferir]
+    runs-on: ubuntu-latest
+    # Proteger o ambiente `pypi` no GitHub (revisor obrigatório) é configuração do repositório,
+    # não deste arquivo.
     environment: pypi
     permissions:
       id-token: write          # OIDC para o Trusted Publishing do PyPI
@@ -26,9 +62,9 @@ jobs:
           python -m pip install --upgrade pip build
           python -m build
       - name: Publish to PyPI
+        # Sem skip-existing: a mesma versão não sobe duas vezes (o PyPI recusa), e um re-run
+        # que "passasse" esconderia uma tag reaproveitada.
         uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          skip-existing: true    # re-run da mesma tag não quebra se a versão já está no PyPI
       - name: GitHub Release
         uses: softprops/action-gh-release@v2
         with:

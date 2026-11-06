@@ -71,3 +71,17 @@ def test_recuo_nunca_muda_o_dia():
 
 def test_dh_emi_e_d_comp_no_mesmo_dia():
     assert relogio.dh_emi()[:10] == relogio.d_comp()
+
+
+def test_sem_base_de_fusos_cai_em_utc_menos_3(monkeypatch):
+    """Windows sem o pacote `tzdata`: o import não pode quebrar (quebrava até a 1.6.0)."""
+    from zoneinfo import ZoneInfoNotFoundError
+
+    def sem_base(nome):
+        raise ZoneInfoNotFoundError(nome)
+
+    monkeypatch.setattr(relogio, "ZoneInfo", sem_base)
+    fuso = relogio._fuso_brasilia()
+    momento = datetime(2026, 11, 6, 10, 0, 0, tzinfo=fuso)
+    assert momento.isoformat() == "2026-11-06T10:00:00-03:00"
+    assert relogio.dh_emi(momento) == "2026-11-06T10:00:00-03:00"

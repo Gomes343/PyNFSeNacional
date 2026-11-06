@@ -4,17 +4,25 @@ on:
   push:
     branches: [master, main]
   pull_request:
+  # O release.yml chama este mesmo workflow antes de publicar: nada sobe ao PyPI sem a suíte.
+  workflow_call:
 
 permissions:
   contents: read
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
+        os: [ubuntu-latest]
         python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
+        include:
+          # "OS Independent" no classifier tem de ser verdade: no Windows o zoneinfo não tem a
+          # base de fusos do sistema (vem do pacote tzdata) — até a 1.6.0 o import quebrava lá.
+          - os: windows-latest
+            python-version: "3.12"
     steps:
       - uses: actions/checkout@v4
 
@@ -36,6 +44,24 @@ jobs:
 
       - name: Tests (pytest)
         # requires_cert: precisa de um .pfx real — roda só localmente, nunca no CI.
+        run: pytest -m "not requires_cert"
+
+  minimas:
+    # Os PISOS declarados no pyproject, instalados exatamente (.github/minimas.txt). Sem esta
+    # célula o CI só via a versão mais nova de tudo, e os pisos antigos montavam uma pilha que
+    # não assinava (signxml 3 + pyOpenSSL novo).
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install (pisos)
+        run: |
+          python -m pip install --upgrade pip
+          pip install -c .github/minimas.txt -e ".[dev]"
+          pip list
+      - name: Tests (pytest)
         run: pytest -m "not requires_cert"
 
   lock:
