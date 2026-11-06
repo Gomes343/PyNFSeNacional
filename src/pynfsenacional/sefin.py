@@ -126,7 +126,8 @@ EVENTO_ANALISE_INDEFERIDA = "105105"
 CANCELADA = "cancelada"            # há um evento que cancela
 EM_ANALISE = "em_analise"          # só o pedido de análise, sem decisão: a nota segue válida
 INDEFERIDA = "indeferida"          # a análise negou o cancelamento: a nota segue válida
-SEM_CANCELAMENTO = "sem_cancelamento"
+SEM_CANCELAMENTO = "sem_cancelamento"  # ☠️ NÃO prova nada: a produção não acha, logo depois,
+#                                        um cancelamento recém-registrado (medido, 06/11/2026)
 
 
 @dataclass
@@ -176,8 +177,9 @@ def conferir_e0840(cliente: SefinClient, chave: str) -> tuple[str | None, str]:
                     "deferimento",
         INDEFERIDA: "a SEFIN respondeu E0840, mas a nota NÃO está cancelada: o pedido de análise "
                     "fiscal foi indeferido pelo município — ela segue válida",
-        SEM_CANCELAMENTO: "a SEFIN respondeu E0840, mas a consulta não achou evento de "
-                          "cancelamento nem de análise na nota — confira no portal",
+        SEM_CANCELAMENTO: "a SEFIN respondeu E0840 (já há um evento de cancelamento vinculado) "
+                          "e a consulta dos eventos não achou nenhum: NÃO SEI se a nota está "
+                          "cancelada ou em análise — confira no portal",
     }[sit]
 
 

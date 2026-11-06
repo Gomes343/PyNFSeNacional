@@ -261,8 +261,9 @@ class Emissor:
         antes de repetir. No direto, o E0840 ("já vinculado") é conferido nos eventos da nota
         (`situacao`): com um evento que cancela, `ok=True`, `cancelada=True`,
         `ja_estava_cancelada=True` e `desfecho=REGISTRADO`; só com o pedido de análise (ou a
-        análise indeferida), `ok=False` e `desfecho=RECUSADO` — a nota segue válida; com a
-        consulta falhando, `desfecho=AMBIGUO`.
+        análise indeferida), `ok=False` e `desfecho=RECUSADO` — a nota segue válida; sem
+        evento nenhum achado ou com a consulta falhando, `desfecho=AMBIGUO` (a consulta de
+        evento da produção não acha, logo depois, um cancelamento recém-registrado).
 
         `conferir_emitente=False` aceita a chave de outro emitente (pedido por procuração,
         autor ≠ emitente) — se a SEFIN aceita, decide ela."""
@@ -293,7 +294,9 @@ class Emissor:
             return ResultadoEvento(ok=False, chave_acesso=ch, modo=modo,
                                    erro_codigo=r.erro_codigo,
                                    erro_msg=f"[{r.erro_codigo}] {explicacao}", erros=r.erros,
-                                   desfecho=sefin.AMBIGUO if sit is None else sefin.RECUSADO,
+                                   desfecho=(sefin.RECUSADO if sit in (sefin.EM_ANALISE,
+                                                                       sefin.INDEFERIDA)
+                                             else sefin.AMBIGUO),
                                    situacao=sit)
         if not r.ok:
             logger.warning("evento %s: [%s] %s", r.desfecho, r.erro_codigo, r.erro_msg)

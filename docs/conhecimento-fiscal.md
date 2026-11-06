@@ -672,8 +672,11 @@ que cancela em produção): `Id = "PRE" + chave + tipo do evento`; `tpAmb` → `
   segue válida (medido em homologação: depois do e101103 registrado, `GET
   /nfse/{chave}/eventos/101101/1` deu 404 e `.../101103/1` deu 200). Por isso o `Emissor.cancelar`
   pergunta à SEFIN (`situacao_cancelamento`): só com um evento que cancela (101101, 105102,
-  105104, 305101) a nota "JÁ estava cancelada"; com o pedido de análise é recusa; com a consulta
-  falhando, ambíguo.
+  105104, 305101) a nota "JÁ estava cancelada"; com o pedido de análise é recusa; sem evento
+  achado ou com a consulta falhando, ambíguo.
+- ☠️ **A consulta de evento atrasa em PRODUÇÃO:** um cancelamento registrado deu 404 em
+  `GET .../eventos/101101/1` cerca de 1 minuto depois e 200 cerca de 2 minutos depois (medido).
+  "Não achei evento" não prova que a nota segue válida.
 - Consulta de evento: `GET /nfse/{chave}/eventos/{tipo}/{seq}` → 200 com a lista `eventos` (o
   `arquivoXml` vem em base64 de base64+gzip); evento inexistente = **404 com corpo JSON**; rota sem
   o tipo ou o sequencial = 404 em HTML (rota errada, não "não existe"); `GET .../eventos` = 405.

@@ -24,8 +24,9 @@ pacote passa a instalar uma pilha que assina em qualquer piso declarado.
   `SefinClient.situacao_cancelamento(chave)` (`cancelada` · `em_analise` · `indeferida` ·
   `sem_cancelamento`) e `sefin.conferir_e0840(cliente, chave)`. No `Emissor.cancelar`: com um
   evento que cancela (101101, 105102, 105104, 305101), `ok=True`, `cancelada=True`,
-  `ja_estava_cancelada=True`, `desfecho="registrado"`; sem ele, `ok=False` e
-  `desfecho="recusado"`; com a consulta falhando, `desfecho="ambiguo"`.
+  `ja_estava_cancelada=True`, `desfecho="registrado"`; com o pedido de análise (ou a análise
+  indeferida), `ok=False` e `desfecho="recusado"`; sem evento achado ou com a consulta falhando,
+  `desfecho="ambiguo"` — em produção a consulta de evento atrasa (~1–2 min).
   `ResultadoEvento.situacao` diz o que a consulta achou. `RespostaEvento.ja_vinculado` expõe o
   E0840 a quem usa o `SefinClient` direto.
 - **O cancelamento tem teto de relógio:** `Emissor.cancelar(..., prazo_s=90)`; estourado, é

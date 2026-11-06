@@ -322,7 +322,7 @@ def test_cancelar_e0840_no_direto_e_nota_ja_cancelada(emissor, monkeypatch):
     assert not r.ambiguo and r.erro_codigo == "E0840" and r.situacao == "cancelada"
 
 
-@pytest.mark.parametrize("sit", ["em_analise", "indeferida", "sem_cancelamento"])
+@pytest.mark.parametrize("sit", ["em_analise", "indeferida"])
 def test_cancelar_e0840_sem_evento_que_cancela_nao_e_cancelada(emissor, monkeypatch, sit):
     """☠️ Medido em homologação (06/11/2026): o e101101 de uma nota que só tem o PEDIDO DE
     ANÁLISE (e101103) também volta E0840. Ler isso como "já estava cancelada" marcaria como
@@ -336,6 +336,19 @@ def test_cancelar_e0840_sem_evento_que_cancela_nao_e_cancelada(emissor, monkeypa
     r = emissor.cancelar(CHAVE, justificativa=JUST)
     assert not r.ok and not r.cancelada and not r.ja_estava_cancelada
     assert r.desfecho == RECUSADO and r.situacao == sit and r.erro_codigo == "E0840"
+
+
+def test_cancelar_e0840_sem_evento_achado_e_ambiguo(emissor, monkeypatch):
+    """☠️ Medido em produção (06/11/2026): a consulta do evento 101101 deu 404 um minuto
+    depois de o cancelamento ser registrado. "Não achei" não prova que a nota segue válida."""
+    fake = FakeSefin(evento=RespostaEvento(
+        ok=False, erro_codigo="E0840", erro_msg="já vinculado",
+        erros=[{"codigo": "E0840", "descricao": "já vinculado", "complemento": None}]))
+    fake.situacao_cancelamento = lambda ch: "sem_cancelamento"
+    monkeypatch.setattr(emissor, "_sefin_client", lambda: fake)
+    r = emissor.cancelar(CHAVE, justificativa=JUST)
+    assert not r.ok and not r.cancelada and r.ambiguo and r.situacao == "sem_cancelamento"
+    assert "NÃO SEI" in (r.erro_msg or "")
 
 
 def test_cancelar_e0840_com_consulta_falhando_e_ambiguo(emissor, monkeypatch):
