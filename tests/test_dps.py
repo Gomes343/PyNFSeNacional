@@ -319,3 +319,59 @@ def test_item_12_sem_evento_e_e0390_antes_do_envio():
 ])
 def test_evento_incompleto_e_recusado(ev, trecho):
     assert any(trecho in p for p in _cfg_evento(**ev).validar())
+
+
+# ── E0392, tamanhos do XSD e a data estrita (revisão 1.7.0) ─────────────────────────────────
+def _cfg_evento_ctrib(ctrib, **ev):
+    return ClienteConfig.from_dict(
+        {**CONFIG_VALIDA,
+         "servico": {**CONFIG_VALIDA["servico"], "cTribNac": ctrib, "cTribMun": "",
+                     "evento": {**_EVENTO, **ev}}})
+
+
+def test_evento_fora_do_item_12_e_e0392():
+    assert any("E0392" in p for p in _cfg_evento_ctrib("041601").validar())
+    assert not any("E0392" in p for p in _cfg_evento_ctrib("990101").validar())
+    assert not any("E0392" in p for p in _cfg_evento_ctrib("99.01.01").validar())
+    assert _cfg_evento_ctrib("121101").validar() == []
+
+
+@pytest.mark.parametrize("data", ["20261104", "2026-W45-3", "1999-11-04", " ", "2026-13-01"])
+def test_data_do_evento_so_aaaa_mm_dd(data):
+    assert any("evento.inicio" in p for p in _cfg_evento(inicio=data).validar())
+
+
+def test_data_com_espacos_vai_aparada():
+    inf = _inf(_montar(_cfg_evento(inicio=" 2026-11-04 ")))
+    assert _txt(inf, "serv/atvEvento/dtIni") == "2026-11-04"
+
+
+def test_id_do_evento_ate_30():
+    assert _cfg_evento(id="X" * 30).validar() == []
+    assert any("idAtvEvt" in p for p in _cfg_evento(id="X" * 31).validar())
+
+
+def test_endereco_do_evento_cortado_no_tamanho_do_xsd():
+    longo = {"cep": "01310-100", "logradouro": "L" * 300, "numero": "N" * 80,
+             "complemento": "C" * 200, "bairro": "B" * 80}
+    inf = _inf(_montar(_cfg_evento(nome="X" * 300, endereco=longo)))
+    assert len(_txt(inf, "serv/atvEvento/end/xLgr")) == 255
+    assert len(_txt(inf, "serv/atvEvento/end/nro")) == 60
+    assert len(_txt(inf, "serv/atvEvento/end/xCpl")) == 156
+    assert len(_txt(inf, "serv/atvEvento/end/xBairro")) == 60
+    assert len(_txt(inf, "serv/atvEvento/xNome")) == 255
+
+
+def test_evento_sem_complemento_nao_leva_xcpl():
+    end = {k: v for k, v in _EVENTO["endereco"].items() if k != "complemento"}
+    inf = _inf(_montar(_cfg_evento(endereco=end)))
+    atv_end = inf.find(f"{{{NS}}}serv/{{{NS}}}atvEvento/{{{NS}}}end")
+    assert [etree.QName(c).localname for c in atv_end] == ["CEP", "xLgr", "nro", "xBairro"]
+
+
+@pytest.mark.parametrize("campo, valor, trecho", [
+    ("cep", "0131010", "cep"), ("logradouro", "", "logradouro"), ("bairro", " ", "bairro"),
+])
+def test_endereco_do_evento_invalido(campo, valor, trecho):
+    end = {**_EVENTO["endereco"], campo: valor}
+    assert any(f"evento.endereco.{trecho}" in p for p in _cfg_evento(endereco=end).validar())

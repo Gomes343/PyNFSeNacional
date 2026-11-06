@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import dataclasses
 import json
+import re
 from dataclasses import dataclass, field
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
@@ -433,34 +434,60 @@ class ClienteConfig:
         return problemas
 
 
+# TCAtvEvento / TCEnderecoSimples do XSD (os dois leiautes): idAtvEvt (TSIdeEvento) até 30;
+# xLgr 255, nro 60, xCpl 156, xBairro 60 (o montador corta esses, como no tomador).
+EVENTO_ID_MAX = 30
+# TSData: AAAA-MM-DD com ano 20xx. `date.fromisoformat` sozinho não serve: do Python 3.11 em
+# diante ele aceita também "20261104" e "2026-W45-3", e a string crua ia para o dtIni.
+_RE_TSDATA = re.compile(r"20\d{2}-\d{2}-\d{2}")
+
+
+def item_12(cTribNac: str | None) -> bool:
+    """O `cTribNac` é do item 12 da lista de serviços (diversões, eventos)?"""
+    return str(cTribNac or "").strip().startswith("12")
+
+
 def validar_evento(evento: dict[str, Any] | None, cTribNac: str = "") -> list[str]:
-    """Problemas do grupo Atividade/Evento (vazia = ok). Item 12 sem evento é E0390; com
-    evento, o grupo tem de passar no XSD (TCAtvEvento) — nome, datas e o local (id OU endereço
+    """Problemas do grupo Atividade/Evento (vazia = ok). Item 12 sem evento é E0390; evento
+    fora do item 12 (e fora do 99.01.01) é E0392; com evento, o grupo tem de passar no XSD
+    (TCAtvEvento) — nome, datas AAAA-MM-DD e o local (id de até 30 posições OU endereço
     nacional completo: CEP, logradouro, número e bairro)."""
     from datetime import date
     ev = evento or {}
     problemas: list[str] = []
+    ctrib = str(cTribNac or "").strip()
     if not ev:
-        if str(cTribNac or "").startswith("12"):
+        if item_12(ctrib):
             problemas.append(
                 f"E0390: o cTribNac {cTribNac} é do item 12 da lista de serviços — a DPS exige o "
                 f"grupo Atividade/Evento (servico.evento: nome, inicio, fim e id ou endereco)"
             )
         return problemas
+    if ctrib and not item_12(ctrib) and documentos.digitos(ctrib) != "990101":
+        problemas.append(
+            f"E0392: o grupo Atividade/Evento (servico.evento) só é permitido no item 12 da "
+            f"lista de serviços (ou no 99.01.01); o cTribNac é {cTribNac}"
+        )
     if not str(ev.get("nome") or "").strip():
         problemas.append("evento.nome (xNome) é obrigatório")
     datas = {}
     for chave in ("inicio", "fim"):
+        bruto = str(ev.get(chave) or "").strip()
         try:
-            datas[chave] = date.fromisoformat(str(ev.get(chave) or ""))
+            if not _RE_TSDATA.fullmatch(bruto):
+                raise ValueError(bruto)
+            datas[chave] = date.fromisoformat(bruto)
         except ValueError:
             problemas.append(
                 f"evento.{chave} deve ser AAAA-MM-DD (TSData); recebido {ev.get(chave)!r}")
     if len(datas) == 2 and datas["fim"] < datas["inicio"]:
         problemas.append(f"evento: fim ({ev['fim']}) antes do início ({ev['inicio']})")
     end = ev.get("endereco") or {}
-    if str(ev.get("id") or "").strip():
-        pass
+    ident = str(ev.get("id") or "").strip()
+    if ident:
+        if len(ident) > EVENTO_ID_MAX:
+            problemas.append(
+                f"evento.id (idAtvEvt) tem no máximo {EVENTO_ID_MAX} posições (tem {len(ident)})")
     elif not end:
         problemas.append("evento: informe o local — 'id' (identificação do evento) ou 'endereco'")
     else:

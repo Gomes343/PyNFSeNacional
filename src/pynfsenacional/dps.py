@@ -262,20 +262,23 @@ def montar_dps(
     ev = s.evento or {}
     if ev:
         atv = _el(serv, "atvEvento")
+        # As datas vão como o validar_evento as aceitou (AAAA-MM-DD, aparadas); os textos do
+        # endereço são cortados no tamanho do XSD, como os do tomador. O idAtvEvt NÃO se corta
+        # (é identificador): acima de 30 posições o validar() recusa.
         _el(atv, "xNome", str(ev["nome"]).strip()[:255])
-        _el(atv, "dtIni", str(ev["inicio"]))
-        _el(atv, "dtFim", str(ev["fim"]))
+        _el(atv, "dtIni", str(ev["inicio"]).strip())
+        _el(atv, "dtFim", str(ev["fim"]).strip())
         if str(ev.get("id") or "").strip():
             _el(atv, "idAtvEvt", str(ev["id"]).strip())
         else:
             e = ev["endereco"]
             end = _el(atv, "end")
             _el(end, "CEP", documentos.digitos(e["cep"]))
-            _el(end, "xLgr", str(e["logradouro"]).strip())
-            _el(end, "nro", str(e["numero"]).strip())
+            _el(end, "xLgr", str(e["logradouro"]).strip()[:255])
+            _el(end, "nro", str(e["numero"]).strip()[:60])
             if str(e.get("complemento") or "").strip():
-                _el(end, "xCpl", str(e["complemento"]).strip())
-            _el(end, "xBairro", str(e["bairro"]).strip())
+                _el(end, "xCpl", str(e["complemento"]).strip()[:156])
+            _el(end, "xBairro", str(e["bairro"]).strip()[:60])
     # infoCompl (0-1) é o ÚLTIMO filho de <serv> no XSD (TCServ) — depois de locPrest/cServ e de
     # comExt/obra/atvEvento/explRod (comExt/obra/explRod não emitimos). Texto livre, sem efeito
     # fiscal: o SEFIN não o interpreta e o DANFSe o imprime como "Inf. Cont.:". Vazio → o grupo
