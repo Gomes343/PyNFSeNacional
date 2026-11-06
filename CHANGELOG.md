@@ -5,6 +5,93 @@ versionamento [SemVer](https://semver.org/lang/pt-BR/).
 
 ## [Não publicado]
 
+## [1.7.0] - 2026-11-06
+
+Revisão de robustez: o que é ambíguo ou demorado deixa de parecer falha (ou sucesso), e o
+pacote passa a instalar uma pilha que assina em qualquer piso declarado.
+
+### Corrigido
+- **Cancelamento ambíguo lido como recusa.** Timeout depois do POST, conexão caída no meio, 5xx
+  sem corpo e 2xx sem o evento viravam o mesmo "falhou" de uma recusa real (ou subiam como
+  exceção) — e a nota que a SEFIN JÁ tinha cancelado seguia "válida" para quem chamou.
+  `RespostaEvento.desfecho` (e `ResultadoEvento.desfecho`) diz agora `registrado`, `recusado`,
+  `nao_enviado` ou `ambiguo` (+ a propriedade `ambiguo`); o `registrar_evento` não levanta mais por
+  falha de rede. Sem retentativa automática.
+- **E0840 no cancelamento direto** ("o evento de Cancelamento já está vinculado à NFS-e", a 2ª
+  tentativa depois de uma resposta perdida) vira `ok=True`, `cancelada=True`,
+  `ja_estava_cancelada=True` no `Emissor.cancelar`. `RespostaEvento.ja_vinculado` expõe o E0840 a
+  quem usa o `SefinClient` direto.
+- **O cancelamento tem teto de relógio:** `Emissor.cancelar(..., prazo_s=90)`; estourado, é
+  ambíguo. Sem ele, uma resposta que goteja prendia a chamada, porque o `timeout` vale entre bytes.
+- **Justificativa até 255 caracteres**, o `TSMotivo` do XSD de eventos (a lib parava em 200).
+- **CNPJ do autor começando com "NFS"** virava `CPFAutor`: o autor era limpo como a chave de acesso,
+  que tira o prefixo `NFS`. Agora `eventos.limpar_autor`.
+- **Chave de outro emitente:** `validar_cancelamento(..., autor=)` e `montar_cancelamento` recusam,
+  antes de assinar, a chave cujo emitente não é o autor (`conferir_emitente=False` para procuração).
+- **A senha do .pfx ia para a linha de comando do `openssl`** no fallback de cifra legada (legível em
+  `/proc/<pid>/cmdline`), e a chave privada passava em claro por um arquivo temporário. Agora a
+  senha vai pela entrada padrão e o PEM volta pela saída padrão.
+- **O .pfx legado só abria no objeto `Certificado`:** a assinatura e o mTLS reliam o arquivo
+  original e davam "senha inválida". `Certificado.pkcs12_bytes()` devolve o material que o objeto
+  leu (o reembalado, no legado); `assinar_dps`/`assinar_xml` e `SefinClient` aceitam `pkcs12_data=`
+  (alternativa a `cert_pfx_path`), e o `Emissor` usa os bytes.
+- **CN sem ":"**: o CNPJ é procurado no CN (com DV válido) e, sem ele, na SAN ICP-Brasil
+  (`2.16.76.1.3.3`; o CPF em `2.16.76.1.3.1`).
+- **Caixa DF-e:** o XML embutido que não é UTF-8 era descartado calado e o NSU passava por cima.
+  Agora `DocumentoDfe.xml_bytes` guarda os bytes, o texto sai pela codificação declarada, e
+  `RespostaDfe.ilegiveis` lista os NSUs que não deu para ler (`DocumentoDfe.erro_xml`).
+- **Consultas de parametrização:** um 404 sem a resposta do ADN, um corpo não-JSON (inclusive no
+  200) e um 200 sem `parametrosConvenio`/`aliquotas` levantam `RuntimeError` (antes, "não existe").
+  A entrada é conferida antes do GET (`ValueError`: município sem 7 dígitos, código fora de
+  `00.00.00.000`, competência fora de `AAAA-MM-DD`). A `mensagem` do ADN fica em
+  `SefinClient.ultima_mensagem_adn`.
+- **Grupo Atividade/Evento:** o `validar()` acusa o **E0392** (o grupo fora do item 12, exceto o
+  99.01.01), `id` com mais de 30 posições e data que não seja `AAAA-MM-DD` estrito (o
+  `date.fromisoformat` do Python 3.11+ aceitava `20261104`, que o XSD recusa); o montador corta
+  logradouro, número, complemento e bairro no tamanho do XSD e grava a data aparada.
+- **Prestador de município com endpoint próprio** falava também com o **ADN** sem conferir o
+  certificado do servidor. A conferência desligada vale só para o endpoint do município
+  (`SefinClient.verificar_adn`).
+- **`warnings.catch_warnings` em cada requisição** não era seguro entre threads (salva e restaura a
+  lista GLOBAL de filtros): um "ignore" de uma thread ficava valendo para o processo. A requisição
+  não mexe mais nos filtros; o aviso do .pfx BER é filtrado uma vez, no import, só por mensagem.
+- **`import pynfsenacional` quebrava no Windows** sem o pacote `tzdata` (o `zoneinfo` de lá não tem
+  a base do sistema). Agora `tzdata` é dependência no Windows e, sem a base, o relógio cai no UTC-3
+  fixo (o mesmo fuso desde 2019).
+- **`__version__` de uma instalação editável antiga** dizia a versão do metadado gravado (ex. 1.0.0)
+  rodando o código novo: a versão é agora uma constante do código, lida pelo pyproject.
+
+### Adicionado
+- `dfe.sincronizar(..., prazo_s=…, ao_receber_pagina=…)` (e no `Emissor.sincronizar_dfe`): teto de
+  relógio da sincronização inteira — estourado, devolve as páginas completas com `tem_mais=True` e
+  `RespostaDfe.prazo_esgotado=True` — e gravação página a página (se o callback falhar, `parcial` e o
+  `ultimo_nsu` no fim da página anterior).
+- `DocumentoDfe.nome_arquivo()` (`<chave>.xml` / `<chave>_ev<NSU>.xml`: o `ChaveAcesso` do evento é
+  a chave da nota, e o mesmo nome fazia o evento apagar a nota) e `DocumentoDfe.gravar(pasta)`
+  (bytes, gravação atômica).
+- `SefinClient(prazo_total_s=…)`, `timeout=(conectar, ler)` e `prazo_s=` por requisição
+  (`registrar_evento`, `distribuicao_dfe`); `sefin.PrazoEsgotado`.
+- `Certificado.documento` e `Certificado.tipo_documento` (`"CNPJ"` | `"CPF"`): o e-CPF do sócio não
+  passa mais por e-CNPJ. O `cnpj` segue devolvendo o mesmo que antes (inclusive o CPF de um e-CPF).
+- `chave.emitente_da_chave` / `chave.chave_do_emitente` (o CNPJ/CPF do emitente dentro da chave).
+- `dfe.decodificar_xml`.
+
+### Mudou
+- **Pisos de dependência** que de fato assinam: `signxml>=4` (declarado), `cryptography>=43`,
+  `lxml>=5.2.1`, `erpbrasil.assinatura>=1.8.0`. Com os pisos antigos o resolvedor montava signxml
+  3.2.2 + pyOpenSSL novo, e a suíte dava 11 falhas. O CI ganhou a célula **mínimas**
+  (`.github/minimas.txt`) e o **Windows**.
+- **Release:** a publicação no PyPI espera a suíte (o próprio CI), confere que a tag está no `main`
+  e bate com `__version__` e com o CHANGELOG, e não usa mais `skip-existing`.
+- **sdist** só com o pacote (`src/`, README, LICENSE, CHANGELOG); antes levava testes, docs e
+  arquivos do repositório.
+- Os testes do grupo Atividade/Evento usam dados fictícios.
+
+### Documentação
+- `docs/conhecimento-fiscal.md` §9 (fallback legado, titular), §16 (desfechos, E0840, 255,
+  emitente), §17 (a 8ª posição da chave é o `ambGer`; emitente), §18 (nome do evento, bytes,
+  prazo, ADN conferido), §20 (E0392, E0398, tamanhos, datas), §21 (404 do ADN, entrada conferida).
+
 ## [1.6.0] - 2026-11-05
 
 ### Adicionado
@@ -79,6 +166,16 @@ Os campos do Simples que a NT 009 cria e o esquema publicado ainda não tem (`re
 ### Documentação
 - §19 (os dois leiautes) e, na §8, o grupo IBS/CBS do **Simples** autorizado em homologação, o
   E0322 e o Anexo VIII (de onde tirar NBS, `cIndOp` e `cClassTrib` por item).
+
+## [1.2.1] - 2026-11-01
+
+Publicada no PyPI a partir de um commit **fora do `main`** (`6ea182e`, hoje no ramo
+`release/1.2.x`), sem passar pelo CI, depois da 1.3.0. O conteúdo é o mesmo conserto que a 1.3.1
+trouxe para o `main`, aplicado sobre a 1.2.0. Fica registrada para quem fixa `~=1.2.0`.
+
+### Corrigido
+- **A recusa da distribuição DF-e lia como caixa vazia** (`REJEICAO` / HTTP 400, ex. E2245 sem
+  procuração) — ver a 1.3.1.
 
 ## [1.2.0] - 2026-10-31
 

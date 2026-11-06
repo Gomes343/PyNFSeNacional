@@ -373,7 +373,16 @@ presumido (`cCredPres`).
   OpenSSL 3 desabilita por padrão. Na referência PHP isso exigiu `openssl-legacy.cnf` +
   `OPENSSL_CONF` (o SDK reportava "senha incorreta", enganoso). **Em Python**, validar se a
   `cryptography` (`load_key_and_certificates`) lê o `.pfx` direto; se topar com o mesmo bloqueio de
-  cifra legada, é o ponto a tratar (não é "senha errada").
+  cifra legada, é o ponto a tratar (não é "senha errada"). O `Certificado` tenta o `openssl
+  pkcs12 -legacy` como fallback, com a senha pela **entrada padrão** (nunca no argv, que qualquer
+  processo lê em `/proc`) e o PEM pela saída padrão (a chave em claro não toca o disco), e
+  reembala num PKCS#12 moderno: `Certificado.pkcs12_bytes()` é o que a assinatura e o mTLS usam
+  (`pkcs12_data=`). Antes da 1.7.0 eles reliam o arquivo original — o objeto abria e a emissão
+  dava "senha inválida".
+- **Quem é o titular:** `Certificado.tipo_documento` diz `"CNPJ"` (e-CNPJ) ou `"CPF"` (e-CPF) —
+  o `cnpj` (nome antigo) devolve o CPF de um e-CPF. Fontes, em ordem: depois do `:` do CN
+  ICP-Brasil; sem `:`, um CNPJ com DV válido dentro do CN; sem ele, a SAN (otherName
+  `2.16.76.1.3.3` = CNPJ; `2.16.76.1.3.1` = nascimento + CPF da pessoa física).
 - **QR Code / PNG** no DANFSe: garantir as deps da lib de PDF.
 
 ---
@@ -648,10 +657,24 @@ que cancela em produção): `Id = "PRE" + chave + tipo do evento`; `tpAmb` → `
   `Solicitacao de Analise Fiscal…` sem acento; enviado assim volta **E1235**. Aceito:
   `Cancelamento de NFS-e` e `Solicitação de Análise Fiscal para Cancelamento de NFS-e`.
 - `cMotivo`: **1** Erro na Emissão · **2** Serviço não Prestado · **9** Outros.
-- `xMotivo` (justificativa): **15 a 200 caracteres**.
+- `xMotivo` (justificativa): **15 a 255 caracteres** — o `TSMotivo` do XSD de eventos v1.01
+  (`minLength 15`, `maxLength 255`). Até a 1.6.0 a lib parava em 200, sem fonte que o sustentasse;
+  o limite que a SEFIN aplica de fato não foi medido ao vivo (uma recusa acima de 200 viria como
+  E-code, sem nota cancelada à toa).
+- **O autor é o emitente.** A chave traz o CNPJ/CPF de quem emitiu (§17): a lib recusa, antes de
+  assinar, o cancelamento de uma chave de OUTRO emitente (`montar_cancelamento(...,
+  conferir_emitente=False)` desliga, para quem pede por procuração).
 - `dhEvento` leva o mesmo recuo do `dhEmi` (§4, E0008).
 - Cancelar de novo uma nota já cancelada volta **E0840** ("o evento de Cancelamento já está
-  vinculado à NFS-e") — medido em homologação.
+  vinculado à NFS-e") — medido em homologação. No **direto**, o `Emissor.cancelar` lê o E0840 como
+  a nota que JÁ estava cancelada (`ok`, `cancelada`, `ja_estava_cancelada`): é o que acontece na
+  2ª tentativa depois de uma resposta perdida.
+- ☠️ **O ambíguo não é "falhou".** O pedido é UM POST, sem retentativa. Tempo esgotado depois do
+  envio, conexão caída no meio, 5xx sem corpo, 2xx sem o evento: a SEFIN **pode** ter registrado.
+  `RespostaEvento.desfecho` separa `registrado` · `recusado` (a SEFIN respondeu e não registrou) ·
+  `nao_enviado` (a conexão nem abriu) · `ambiguo`. No ambíguo, confira a nota antes de repetir.
+  Teto de relógio do pedido inteiro: `prazo_s` (90 s no `Emissor.cancelar`, como a referência PHP)
+  — sem ele, uma resposta que goteja segura a chamada, porque o `timeout` vale entre bytes.
 - **Substituição** é outro evento (e105102, com motivos próprios) e ainda não está na lib.
 
 ## 17. Consulta da NFS-e pela chave
@@ -662,8 +685,12 @@ que cancela em produção): `Id = "PRE" + chave + tipo do evento`; `tpAmb` → `
 
 O XML da NFS-e **não traz `<chNFSe>`**: a chave mora no `Id` do `infNFSe` (`NFS` + 50 posições).
 E o `nNFSe` está dentro da própria chave (posições 24 a 36), o que serve de reserva quando o XML
-não veio. Layout: cMun 7 · tpAmb 1 · tpInsc 1 · CNPJ/CPF 14 · nNFSe 13 · AAMM 4 · código 9 · DV 1
-(conferido contra 325 NFS-e autorizadas).
+não veio. Layout: cMun 7 · **ambGer 1** · tpInsc 1 · CNPJ/CPF 14 · nNFSe 13 · AAMM 4 · código 9 · DV 1
+(conferido contra 325 NFS-e autorizadas). A 8ª posição é o ambiente **gerador** (2 = Sistema
+Nacional em toda nota nacional), não produção/homologação: a chave não diz o ambiente. A 9ª é o
+tipo da inscrição do emitente (1 = CPF, 2 = CNPJ — o 2 conferido em notas reais) e as 14 seguintes,
+a inscrição (o CPF completado com zeros à esquerda, por dedução: falta uma nota real de prestador
+pessoa física para conferir). `chave.emitente_da_chave` / `chave.chave_do_emitente`.
 
 ## 18. Distribuição DF-e — a caixa postal do CNPJ (ADN)
 
@@ -684,6 +711,21 @@ CNPJ: as notas que ele **emitiu**, as que **recebeu** como tomador e os **evento
   baixar caixas de centenas de notas.
 - **Emitida × recebida:** o XML não diz de que lado o CNPJ está — compare o CNPJ do `<prest>` da
   DPS (sem ele, o do `<emit>`) com o do certificado.
+- ☠️ **O `ChaveAcesso` de um EVENTO é a chave da própria nota.** Gravar tudo como `<chave>.xml` faz
+  o evento apagar a nota (ou outro evento dela) na pasta e num ZIP. O NSU é único na caixa:
+  `DocumentoDfe.nome_arquivo()` dá `<chave>.xml` à nota e `<chave>_ev<NSU>.xml` ao evento (o
+  sequencial do evento não serve: repete entre tipos). `DocumentoDfe.gravar(pasta)` grava assim, de
+  forma atômica (temporário + `os.replace`).
+- **O XML embutido pode não ser UTF-8** (prefeitura conveniada com `encoding="ISO-8859-1"`). A lib
+  guarda os bytes (`xml_bytes`, que é o que se grava), decodifica pela codificação declarada e
+  lista em `RespostaDfe.ilegiveis` o NSU que não deu para ler — o NSU passa por ele, então alguém
+  decide. Até a 1.6.0 o item sumia calado.
+- **Tempo contado:** `sincronizar(..., prazo_s=…)` é o teto de relógio da sincronização inteira —
+  estourado, devolve as páginas completas (`tem_mais`, `prazo_esgotado`), com o `ultimo_nsu`
+  consistente; `ao_receber_pagina` grava à medida. Quem roda dentro de um processo que outro mata
+  (timeout de subprocesso) precisa dos dois: sem eles, nada ficava em disco e o NSU não andava.
+- **Certificado do servidor:** o ADN é sempre conferido, mesmo para o prestador de município com
+  endpoint próprio sem conferência (§1).
 
 ## 19. ★ Os dois leiautes do XSD: produção (09/02/2026) × NT 009 (20/10/2026)
 
@@ -739,6 +781,15 @@ também o item cujo ISS é devido no **local do evento** (LC 116/2003, art. 3º)
   logradouro, numero, complemento?, bairro}}`. Vazio = grupo omitido (a DPS de quem não é do item 12
   não muda). O `validar()` acusa o E0390 antes do envio, datas fora do formato, fim antes do início
   e endereço incompleto.
+- **E0392 — o contrário do E0390:** o grupo **não é permitido** fora do item 12, exceto no 99.01.01
+  (Anexo I). O `validar()` acusa.
+- **E0398:** o CEP do evento tem de ser do município do local da prestação (Anexo I). A lib **não**
+  confere (não tem a base de CEPs): é a SEFIN quem recusa.
+- **Tamanhos do XSD:** `idAtvEvt` até 30 (o `validar()` recusa acima — identificador não se corta);
+  `xLgr` 255, `nro` 60, `xCpl` 156, `xBairro` 60 (o montador corta, como no tomador).
+- **Datas só `AAAA-MM-DD` com ano 20xx** (o `TSData`). Do Python 3.11 em diante o
+  `date.fromisoformat` aceita também `20261104` e `2026-W45-3`, que o XSD recusa: a lib confere o
+  formato antes.
 
 ## 21. Parametrização do município no ADN — convênio e alíquotas (só leitura)
 
@@ -756,5 +807,9 @@ qualquer CNPJ (é consulta pública de parâmetros, só GET):
   **E0312** na emissão.
 
 Na lib: `Emissor.consultar_convenio()` / `Emissor.consultar_aliquota(codigo, competencia)` (ou
-`SefinClient.parametros_convenio` / `.aliquotas`). O 404 vira `None` / lista vazia; qualquer outro
-status levanta `RuntimeError` — "não deu para saber" nunca vira "não existe".
+`SefinClient.parametros_convenio` / `.aliquotas`). O 404 **do ADN** (corpo JSON com a chave
+esperada ou a `mensagem` dele) vira `None` / lista vazia; um 404 sem esse corpo, um corpo que não é
+JSON e qualquer outro status levantam `RuntimeError` — "não deu para saber" nunca vira "não existe".
+A entrada é conferida antes do GET (`ValueError`): município com 7 dígitos, código `00.00.00.000`,
+competência `AAAA-MM-DD` — um código sem pontos virava "alíquotas não encontradas". A `mensagem` do
+ADN fica em `SefinClient.ultima_mensagem_adn`.

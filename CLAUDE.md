@@ -63,7 +63,8 @@ ruff check .               # lint
 ponta a ponta: **validar → montar DPS → assinar → transporte mTLS → Nota** (+ `nota.danfse()`).
 
 - `config.py` — dataclasses + `validar()` (E-codes) + loader tolerante. ✅
-- `certificado.py` — leitura do `.pfx` via `cryptography` (+ fallback cifra legada §9). ✅
+- `certificado.py` — leitura do `.pfx` via `cryptography` (+ fallback cifra legada §9, senha pelo
+  stdin; `pkcs12_bytes()` leva o material lido à assinatura e ao mTLS; `tipo_documento`). ✅
 - `dps.py` — `montar_dps`/`id_dps`; o C14N do `infDPS` bate **byte-a-byte** com o PHP (golden). ✅
   - **Fix 25/06/2026:** a `<IM>` (Inscrição Municipal) saía DEPOIS do `<regTrib>` dentro de `<prest>`,
     violando a ordem do XSD (AnexoI) → **E1235** para todo prestador COM inscrição municipal. O golden
@@ -107,6 +108,14 @@ ponta a ponta: **validar → montar DPS → assinar → transporte mTLS → Nota
   e `Emissor.sincronizar_dfe` (`dfe.py`, caixa postal do ADN por NSU). Validados ao vivo em
   homologação. O contador de nDPS deixou de travar no `ja_emitida` (compara valor + tomador da
   nota achada) e o valor passou a `Decimal`. Regra em `docs/conhecimento-fiscal.md` §5, §16–§18.
+- **1.7.0 (06/11/2026) — robustez (revisão adversarial):** o pedido de evento tem `desfecho`
+  (`registrado`/`recusado`/`nao_enviado`/`ambiguo`) e não levanta por rede; E0840 no direto = já
+  cancelada; teto de relógio (`prazo_s`) no cancelamento e na caixa DF-e (que grava por página,
+  nomeia o evento `<chave>_ev<NSU>.xml` e guarda os bytes do XML); `Certificado.tipo_documento`
+  (e-CNPJ × e-CPF), CN sem ":" e SAN, senha do fallback legado pelo stdin e `pkcs12_bytes()` até a
+  assinatura e o mTLS; E0392 e tamanhos do XSD no evento; 404 do ADN conferido; ADN sempre com
+  conferência do servidor; `tzdata` no Windows; pisos que assinam + célula "mínimas" e Windows no
+  CI; release só com CI verde, tag no `main` e versão batendo. Versão = constante em `__init__.py`.
 - **1.6.0 (05/11/2026) — `pAliq`:** a alíquota do ISS retido do ME/EPP (E0621/E0628/E0625, teto 5%),
   último filho do `tribMun`; sem o campo a DPS não muda. Regra em `docs/conhecimento-fiscal.md` §15.
 - **1.5.0 (05/11/2026) — parametrização do município:** `Emissor.consultar_convenio` e
@@ -146,7 +155,7 @@ leiaute padrão da produção quando ela virar para o pacote da NT 009; (5) even
 
 Tooling: `pip install -e ".[dev]"` (deps instalam no 3.10–3.14), lock com hashes
 (`requirements-dev.txt`), CI (`.github/workflows/ci.yml`), release por tag (`release.yml`).
-Testes: `pytest` (272 passed, +2 skip locais), `ruff check .`, `mypy --strict` — tudo verde.
+Testes: `pytest` (463 passed, +2 skip locais), `ruff check .`, `mypy --strict` — tudo verde.
 
 ## Regras
 

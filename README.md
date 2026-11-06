@@ -87,7 +87,7 @@ pip install "PyNFSeNacionalGT[danfse]"
 > depois de uma resposta perdida (toda emissão seguinte voltava "já emitida") e traz cancelamento,
 > consulta pela chave e a caixa postal DF-e; a 1.3.1 faz a caixa DF-e distinguir a RECUSA (ex.:
 > consulta por procuração sem a procuração, E2245) de uma caixa vazia; a 1.3.2 faz a conferência do `ja_emitida` ler o tomador
-> como a DPS o escreve (`cnpj`/`cpf`), sem reenviar a própria nota em número novo; a 1.4.0 traz o grupo Atividade/Evento, obrigatório no item 12 (E0390); a 1.5.0 consulta o convênio e as alíquotas do município; a 1.6.0 emite o `pAliq` do ISS retido do ME/EPP. O histórico de cada versão está no [CHANGELOG](CHANGELOG.md).
+> como a DPS o escreve (`cnpj`/`cpf`), sem reenviar a própria nota em número novo; a 1.4.0 traz o grupo Atividade/Evento, obrigatório no item 12 (E0390); a 1.5.0 consulta o convênio e as alíquotas do município; a 1.6.0 emite o `pAliq` do ISS retido do ME/EPP; a 1.7.0 separa o cancelamento recusado do ambíguo, põe prazo na caixa DF-e e diz se o certificado é e-CNPJ ou e-CPF. O histórico de cada versão está no [CHANGELOG](CHANGELOG.md).
 
 ---
 
@@ -120,10 +120,15 @@ r = emissor.cancelar(chave, justificativa="Erro na emissão da nota fiscal", mot
 # motivo: 1=Erro na Emissão · 2=Serviço não Prestado · 9=Outros
 # município que não aceita o cancelamento direto (E0823): modo="analise"
 print(r.ok, r.cancelada, r.erro_msg)
+# r.desfecho: "registrado" | "recusado" | "nao_enviado" | "ambiguo"
+if r.ambiguo:          # o pedido saiu e a resposta não veio: PODE ter cancelado
+    ...                # confira a nota antes de repetir (repetido, volta E0840)
+# no direto, o E0840 ("já vinculado") é a nota que já estava cancelada: r.ja_estava_cancelada
 
-caixa = emissor.sincronizar_dfe(nsu=0)              # emitidas, recebidas e eventos do CNPJ
+caixa = emissor.sincronizar_dfe(nsu=0, prazo_s=120)  # emitidas, recebidas e eventos do CNPJ
 for doc in caixa.documentos:
-    print(doc.nsu, doc.classificar(emissor.cfg.prestador.cnpj), doc.chave_acesso)
+    print(doc.nsu, doc.classificar(emissor.cfg.prestador.cnpj), doc.nome_arquivo())
+    doc.gravar("caixa/")                            # bytes do XML, gravação atômica
 proximo_nsu = caixa.ultimo_nsu                      # guarde: a próxima leitura parte daqui
 ```
 
