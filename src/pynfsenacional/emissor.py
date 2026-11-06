@@ -8,6 +8,7 @@ consulta a nota pela chave, cancela (eventos) e lê a caixa postal DF-e do CNPJ.
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from decimal import Decimal
 from pathlib import Path
@@ -17,6 +18,7 @@ from lxml import etree
 
 from . import assinatura, dfe, documentos, dps, eventos, sefin
 from . import chave as _chave
+from .certificado import Certificado
 from .config import (
     LEIAUTE_NT009,
     LEIAUTE_PRODUCAO,
@@ -33,6 +35,10 @@ logger = logging.getLogger("pynfsenacional.emissor")
 
 # Quantos nDPS o contador pode pular, numa emissão, por estarem tomados por OUTRAS notas.
 MAX_NUMEROS_PULADOS = 20
+
+# Teto de relógio do pedido de cancelamento (conexão + envio + resposta). Estourado, o
+# desfecho é AMBÍGUO — o mesmo teto de 90 s da implementação de referência.
+PRAZO_CANCELAMENTO_S = 90.0
 
 
 @dataclass
@@ -63,7 +69,8 @@ class Nota:
 
 @dataclass
 class ResultadoEvento:
-    """Resultado de um pedido de cancelamento. `ok` = a SEFIN registrou o evento."""
+    """Resultado de um pedido de cancelamento. `ok` = a SEFIN registrou o evento (ou, no
+    direto, ele JÁ estava registrado: `ja_estava_cancelada`)."""
     ok: bool
     chave_acesso: str
     modo: str                         # "direto" (e101101) | "analise" (e101103)
@@ -72,6 +79,17 @@ class ResultadoEvento:
     erro_codigo: str | None = None
     erro_msg: str | None = None
     erros: list[dict[str, str | None]] = field(default_factory=list)
+    # o que aconteceu com o pedido: sefin.REGISTRADO | RECUSADO | NAO_ENVIADO | AMBIGUO
+    desfecho: str = sefin.RECUSADO
+    # direto que voltou E0840 ("o evento de Cancelamento já está vinculado à NFS-e"): a nota
+    # JÁ estava cancelada — típico da 2ª tentativa depois de uma resposta perdida.
+    ja_estava_cancelada: bool = False
+
+    @property
+    def ambiguo(self) -> bool:
+        """☠️ Não é "falhou": o pedido saiu e a resposta não veio. A SEFIN PODE ter registrado
+        o cancelamento — confira a nota (consulta, caixa DF-e ou portal) antes de repetir."""
+        return self.desfecho == sefin.AMBIGUO
 
 
 def _dica_leiaute(msg: str | None, codigo: str | None, leiaute: str) -> str | None:
@@ -187,7 +205,7 @@ class Emissor:
         xml = dps.montar_dps(self.cfg, numero=numero, valor=valor, descricao=descricao,
                              tomador=tomador, ambiente=self.ambiente, serie=serie)
         xml_assinado = assinatura.assinar_dps(
-            xml, cert_pfx_path=self.cfg.certificado.path, senha=self.cfg.certificado.senha,
+            xml, pkcs12_data=self._pkcs12(), senha=self.cfg.certificado.senha,
         )
         resp = cliente.emitir(xml_assinado)
 
@@ -223,12 +241,20 @@ class Emissor:
                     nfse_xml=xml, numero_nfse=self._numero(xml, ch))
 
     def cancelar(self, chave: str, *, justificativa: str, motivo: int = 1,
-                 modo: str = "direto") -> ResultadoEvento:
+                 modo: str = "direto",
+                 prazo_s: float | None = PRAZO_CANCELAMENTO_S) -> ResultadoEvento:
         """Cancela a NFS-e (`modo="direto"`, e101101) ou pede a análise fiscal do
         cancelamento (`modo="analise"`, e101103 — para municípios que não aceitam o direto).
 
         `motivo`: 1=Erro na Emissão · 2=Serviço não Prestado · 9=Outros. `justificativa`:
-        15 a 200 caracteres. Valida antes de assinar e levanta `ConfigError`."""
+        15 a 255 caracteres. Valida antes de assinar e levanta `ConfigError` — inclusive
+        quando a chave é de uma nota de OUTRO emitente (não é do prestador da config).
+
+        Um pedido só, sem retentativa. O `desfecho` separa o que a SEFIN recusou
+        (`RECUSADO`), o que nem saiu (`NAO_ENVIADO`) e o que saiu sem resposta (`AMBIGUO`,
+        também quando passa de `prazo_s` segundos de relógio): no ambíguo, CONFIRA a nota
+        antes de repetir. No direto, o E0840 ("já vinculado") é a nota que JÁ estava
+        cancelada: `ok=True`, `cancelada=True`, `ja_estava_cancelada=True`."""
         if self.ambiente not in ("homologacao", "producao"):
             raise ConfigError(f"ambiente inválido: {self.ambiente!r}")
         ch = _chave.limpar(chave)
@@ -236,26 +262,37 @@ class Emissor:
             chave=ch, autor=self.cfg.prestador.cnpj, motivo=motivo,
             justificativa=justificativa, ambiente=self.ambiente, modo=modo,
         )
-        assinado = assinatura.assinar_xml(xml, "infPedReg",
-                                          cert_pfx_path=self.cfg.certificado.path,
+        assinado = assinatura.assinar_xml(xml, "infPedReg", pkcs12_data=self._pkcs12(),
                                           senha=self.cfg.certificado.senha)
         logger.info("cancelando id_cliente=%s ambiente=%s modo=%s", self.cfg.id,
                     self.ambiente, modo)
-        r = self._sefin_client().registrar_evento(ch, assinado)
+        cliente = self._sefin_client()
+        r = (cliente.registrar_evento(ch, assinado, prazo_s=prazo_s) if prazo_s is not None
+             else cliente.registrar_evento(ch, assinado))
+        erro_msg = f"[{r.erro_codigo}] {r.erro_msg}" if r.erro_codigo else r.erro_msg
+        if not r.ok and modo == "direto" and r.ja_vinculado:
+            logger.info("cancelamento: a nota já estava cancelada (E0840)")
+            return ResultadoEvento(ok=True, chave_acesso=ch, modo=modo, cancelada=True,
+                                   ja_estava_cancelada=True, erro_codigo=r.erro_codigo,
+                                   erro_msg=erro_msg, erros=r.erros, desfecho=r.desfecho)
         if not r.ok:
-            logger.warning("evento recusado: [%s] %s", r.erro_codigo, r.erro_msg)
+            logger.warning("evento %s: [%s] %s", r.desfecho, r.erro_codigo, r.erro_msg)
         return ResultadoEvento(
             ok=r.ok, chave_acesso=ch, modo=modo, cancelada=r.ok and modo == "direto",
-            evento_xml=r.evento_xml, erro_codigo=r.erro_codigo,
-            erro_msg=(f"[{r.erro_codigo}] {r.erro_msg}" if r.erro_codigo else r.erro_msg),
-            erros=r.erros,
+            evento_xml=r.evento_xml, erro_codigo=r.erro_codigo, erro_msg=erro_msg,
+            erros=r.erros, desfecho=r.desfecho,
         )
 
-    def sincronizar_dfe(self, nsu: int = 0, *, max_paginas: int = 20) -> dfe.RespostaDfe:
+    def sincronizar_dfe(
+        self, nsu: int = 0, *, max_paginas: int = 20, prazo_s: float | None = None,
+        ao_receber_pagina: Callable[[list[dfe.DocumentoDfe], int], None] | None = None,
+    ) -> dfe.RespostaDfe:
         """Lê a caixa postal DF-e do CNPJ do prestador a partir do `nsu` (guarde o
-        `ultimo_nsu` da resposta para a próxima vez). Ver `dfe.sincronizar`."""
+        `ultimo_nsu` da resposta para a próxima vez). `prazo_s` (teto de relógio) e
+        `ao_receber_pagina` (gravar à medida): ver `dfe.sincronizar`."""
         return dfe.sincronizar(self._sefin_client(), self.cfg.prestador.cnpj, nsu,
-                               max_paginas=max_paginas)
+                               max_paginas=max_paginas, prazo_s=prazo_s,
+                               ao_receber_pagina=ao_receber_pagina)
 
     def consultar_convenio(self, codigo_municipio: str | None = None) -> dict[str, Any] | None:
         """Os parâmetros do convênio do município (por padrão, o do prestador) com o
@@ -329,10 +366,18 @@ class Emissor:
             texto = numero
         self._contador_path().write_text(texto, encoding="utf-8")
 
+    def _pkcs12(self) -> bytes:
+        """O PKCS#12 do certificado da config, lido pelo `Certificado` — o mesmo
+        material na assinatura e no mTLS. Com cifra legada (§9), é o reembalado pelo
+        fallback: até a 1.6.0 a assinatura e o mTLS reliam o arquivo original, e um .pfx que
+        o `Certificado` abria dava "senha inválida" na emissão. Relido a cada chamada: um
+        certificado renovado no disco vale na próxima operação."""
+        return Certificado(self.cfg.certificado).carregar().pkcs12_bytes()
+
     def _sefin_client(self) -> sefin.SefinClient:
         return sefin.SefinClient(
             ambiente=self.ambiente,
-            cert_pfx_path=self.cfg.certificado.path,
+            pkcs12_data=self._pkcs12(),
             senha=self.cfg.certificado.senha,
             codigo_municipio=self.cfg.prestador.codigo_municipio,
         )

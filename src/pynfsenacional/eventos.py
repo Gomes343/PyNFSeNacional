@@ -13,6 +13,7 @@ ACENTUADO, embora o XSD publicado o liste sem acento — sem acento volta E1235.
 
 from __future__ import annotations
 
+import re
 from datetime import datetime
 
 from lxml import etree
@@ -29,14 +30,33 @@ MODOS = {
 
 MOTIVOS = {1: "Erro na Emissão", 2: "Serviço não Prestado", 9: "Outros"}
 
-JUSTIFICATIVA_MIN, JUSTIFICATIVA_MAX = 15, 200
+# TSMotivo do XSD de eventos v1.01: minLength 15, maxLength 255. Até a 1.6.0 a lib parava em
+# 200 (sem fonte); o XSD oficial aceita 255 — §16.
+JUSTIFICATIVA_MIN, JUSTIFICATIVA_MAX = 15, 255
 
 
-def validar_cancelamento(chave: str, motivo: int, justificativa: str, modo: str) -> list[str]:
-    """Os problemas que fazem a SEFIN recusar o pedido — checados antes de assinar."""
+def limpar_autor(autor: str | None) -> str:
+    """O CNPJ/CPF do autor sem máscara, MAIÚSCULO (letras do CNPJ alfanumérico ficam).
+
+    ☠️ Não é a limpeza da chave de acesso: `chave.limpar` tira um "NFS" do começo, e um CNPJ
+    alfanumérico que comece com NFS virava CPFAutor de 11 posições."""
+    return re.sub(r"[^0-9A-Z]", "", (autor or "").upper())
+
+
+def validar_cancelamento(chave: str, motivo: int, justificativa: str, modo: str,
+                         autor: str | None = None) -> list[str]:
+    """Os problemas que fazem a SEFIN recusar o pedido — checados antes de assinar.
+
+    Com `autor` (o CNPJ/CPF de quem pede), confere também que a chave é de uma nota DELE: a
+    chave traz o emitente (`chave.emitente_da_chave`), e um evento assinado pelo prestador
+    errado não tem como dar certo. Sem `autor`, essa conferência não é feita."""
     problemas = []
     if len(_chave.limpar(chave)) != 50:
         problemas.append("chave de acesso deve ter 50 posições")
+    elif autor is not None and _chave.chave_do_emitente(chave, limpar_autor(autor)) is False:
+        problemas.append(
+            f"a chave é de uma nota de outro emitente ({_chave.emitente_da_chave(chave)}), "
+            f"não de {limpar_autor(autor)} — nada foi enviado")
     if motivo not in MOTIVOS:
         problemas.append(f"motivo inválido: {motivo!r} (1=Erro na Emissão, "
                          "2=Serviço não Prestado, 9=Outros)")
@@ -52,16 +72,19 @@ def validar_cancelamento(chave: str, motivo: int, justificativa: str, modo: str)
 def montar_cancelamento(
     *, chave: str, autor: str, motivo: int, justificativa: str, ambiente: str,
     modo: str = "direto", dh_evento: datetime | None = None, ver_aplic: str | None = None,
+    conferir_emitente: bool = True,
 ) -> str:
     """Monta o `pedRegEvento` de cancelamento (NÃO assinado).
 
     `autor`: CNPJ (14) ou CPF (11) de quem pede — o prestador. `dh_evento`/`ver_aplic`
-    são injetáveis para teste determinístico.
+    são injetáveis para teste determinístico. `conferir_emitente=False` desliga a recusa da
+    chave de outro emitente (para quem pede por procuração, autor ≠ emitente).
     """
-    problemas = validar_cancelamento(chave, motivo, justificativa, modo)
+    problemas = validar_cancelamento(chave, motivo, justificativa, modo,
+                                     autor=autor if conferir_emitente else None)
     if ambiente not in ("homologacao", "producao"):
         problemas.append(f"ambiente inválido: {ambiente!r}")
-    doc = _chave.limpar(autor)
+    doc = limpar_autor(autor)
     if len(doc) not in (11, 14):
         problemas.append("autor deve ser um CNPJ (14) ou CPF (11)")
     if problemas:

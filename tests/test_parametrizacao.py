@@ -43,12 +43,80 @@ def test_convenio_inexistente_e_none(client, monkeypatch):
     assert client.parametros_convenio("9999999") is None
 
 
-def test_falha_nao_vira_inexistente(client, monkeypatch):
-    _capturar(client, monkeypatch, FakeResp(status_code=503))
-    with pytest.raises(RuntimeError, match="503"):
+@pytest.mark.parametrize("status", [400, 401, 403, 429, 500, 502, 503])
+def test_falha_nao_vira_inexistente(client, monkeypatch, status):
+    _capturar(client, monkeypatch, FakeResp(status_code=status,
+                                            payload={"mensagem": "qualquer"}))
+    with pytest.raises(RuntimeError, match=str(status)):
         client.parametros_convenio("3555406")
-    with pytest.raises(RuntimeError, match="503"):
+    with pytest.raises(RuntimeError, match=str(status)):
         client.aliquotas("3555406", "07.11.01.000", "2026-11-01")
+
+
+@pytest.mark.parametrize("status", [200, 404])
+def test_corpo_nao_json_nao_vira_inexistente(client, monkeypatch, status):
+    _capturar(client, monkeypatch, FakeResp(status_code=status, text="<html>"))
+    with pytest.raises(RuntimeError, match="não-JSON"):
+        client.parametros_convenio("3555406")
+    with pytest.raises(RuntimeError, match="não-JSON"):
+        client.aliquotas("3555406", "07.11.01.000", "2026-11-01")
+
+
+def test_404_sem_a_resposta_do_adn_levanta(client, monkeypatch):
+    """Um 404 que não é o "não encontrado" do ADN (rota errada, intermediário) é "não sei"."""
+    _capturar(client, monkeypatch, FakeResp(status_code=404, payload={"error": "Not Found"}))
+    with pytest.raises(RuntimeError, match="404"):
+        client.parametros_convenio("3555406")
+    with pytest.raises(RuntimeError, match="404"):
+        client.aliquotas("3555406", "07.11.01.000")
+
+
+def test_mensagem_do_adn_fica_no_cliente(client, monkeypatch):
+    _capturar(client, monkeypatch, FakeResp(status_code=404, payload={
+        "parametrosConvenio": None, "mensagem": "Convênio para o município não encontrado."}))
+    assert client.parametros_convenio("9999999") is None
+    assert client.ultima_mensagem_adn == "Convênio para o município não encontrado."
+
+
+def test_200_sem_parametros_levanta(client, monkeypatch):
+    _capturar(client, monkeypatch, FakeResp(payload={"parametrosConvenio": None}))
+    with pytest.raises(RuntimeError, match="parametrosConvenio"):
+        client.parametros_convenio("3555406")
+    _capturar(client, monkeypatch, FakeResp(payload={"mensagem": "ok"}))
+    with pytest.raises(RuntimeError, match="aliquotas"):
+        client.aliquotas("3555406", "07.11.01.000", "2026-11-01")
+
+
+@pytest.mark.parametrize("mun", ["", "SAO PAULO", "355540", "35554060"])
+def test_municipio_invalido_nao_consulta(client, monkeypatch, mun):
+    urls = _capturar(client, monkeypatch, FakeResp(status_code=404, payload={"mensagem": "x"}))
+    with pytest.raises(ValueError, match="7 dígitos"):
+        client.parametros_convenio(mun)
+    with pytest.raises(ValueError, match="7 dígitos"):
+        client.aliquotas(mun, "07.11.01.000", "2026-11-01")
+    assert urls == []
+
+
+@pytest.mark.parametrize("cod", ["071101000", "", "07.11.01", "7.11.01.000", "07.11.01.0001"])
+def test_codigo_do_servico_fora_do_formato_nao_consulta(client, monkeypatch, cod):
+    urls = _capturar(client, monkeypatch, FakeResp(status_code=404, payload={"mensagem": "x"}))
+    with pytest.raises(ValueError, match="00.00.00.000"):
+        client.aliquotas("3555406", cod, "2026-11-01")
+    assert urls == []
+
+
+@pytest.mark.parametrize("comp", ["01/11/2026", "20261101", "2026-11"])
+def test_competencia_fora_do_formato_nao_consulta(client, monkeypatch, comp):
+    urls = _capturar(client, monkeypatch, FakeResp(payload={"aliquotas": {}}))
+    with pytest.raises(ValueError, match="AAAA-MM-DD"):
+        client.aliquotas("3555406", "07.11.01.000", comp)
+    assert urls == []
+
+
+def test_aliquotas_so_do_codigo_pedido(client, monkeypatch):
+    _capturar(client, monkeypatch, FakeResp(payload={"aliquotas": {
+        "07.11.01.000": [{"Aliq": 2.0}], "07.11.01.001": [{"Aliq": 5.0}]}}))
+    assert client.aliquotas("3555406", "07.11.01.000", "2026-11-01") == [{"Aliq": 2.0}]
 
 
 def test_aliquota_na_competencia(client, monkeypatch):

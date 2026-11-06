@@ -86,12 +86,18 @@ def test_pedido_de_analise_fiscal_tem_xdesc_acentuado():
     assert "<xDesc>Solicitação de Análise Fiscal para Cancelamento de NFS-e</xDesc>" in xml
 
 
+# chave de uma nota emitida por CPF: tpInsc 1 e o CPF completado com zeros à esquerda
+CHAVE_CPF = ("3304557" + "2" + "1" + "000" + "11144477735" + "0000000000147" + "2610"
+             + "123456789" + "0")
+
+
 def test_pedido_por_cpf():
-    assert "<CPFAutor>11144477735</CPFAutor>" in _pedido(autor="111.444.777-35")
+    assert "<CPFAutor>11144477735</CPFAutor>" in _pedido(chave=CHAVE_CPF,
+                                                         autor="111.444.777-35")
 
 
 @pytest.mark.parametrize("kw", [
-    {"justificativa": "curta demais"}, {"justificativa": "x" * 201}, {"motivo": 3},
+    {"justificativa": "curta demais"}, {"justificativa": "x" * 256}, {"motivo": 3},
     {"modo": "outro"}, {"chave": "123"}, {"ambiente": "teste"}, {"autor": "123"},
 ])
 def test_pedido_invalido(kw):

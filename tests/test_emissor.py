@@ -65,8 +65,9 @@ class FakeSefin:
         self.emitiu = int(raiz.find(".//{*}nDPS").text)
         return self.resp
 
-    def registrar_evento(self, chave, xml):
+    def registrar_evento(self, chave, xml, **kw):
         self.evento_enviado = (chave, xml)
+        self.evento_kw = kw
         return self.evento
 
 
@@ -302,3 +303,109 @@ def test_cancelar_pedido_invalido_nao_toca_a_rede(emissor, monkeypatch, kw):
     with pytest.raises(ConfigError):
         emissor.cancelar(CHAVE, **kw)
     assert fake.evento_enviado is None
+
+
+# ── cancelar: E0840, ambíguo, prazo, chave de outro emitente ─────────────────
+def test_cancelar_e0840_no_direto_e_nota_ja_cancelada(emissor, monkeypatch):
+    """A 2ª tentativa depois de uma resposta perdida volta E0840 ("já vinculado"): a nota
+    ESTÁ cancelada. Até a 1.6.0 isso saía como falha — e a nota seguia "válida" para quem
+    chamou."""
+    from pynfsenacional.sefin import RECUSADO
+    fake = FakeSefin(evento=RespostaEvento(
+        ok=False, erro_codigo="E0840", erro_msg="já vinculado",
+        erros=[{"codigo": "E0840", "descricao": "já vinculado", "complemento": None}]))
+    monkeypatch.setattr(emissor, "_sefin_client", lambda: fake)
+    r = emissor.cancelar(CHAVE, justificativa=JUST)
+    assert r.ok and r.cancelada and r.ja_estava_cancelada and r.desfecho == RECUSADO
+
+
+def test_cancelar_e0840_na_analise_nao_vira_cancelada(emissor, monkeypatch):
+    fake = FakeSefin(evento=RespostaEvento(
+        ok=False, erro_codigo="E0840", erro_msg="já vinculado",
+        erros=[{"codigo": "E0840", "descricao": "já vinculado", "complemento": None}]))
+    monkeypatch.setattr(emissor, "_sefin_client", lambda: fake)
+    r = emissor.cancelar(CHAVE, justificativa=JUST, modo="analise")
+    assert not r.ok and not r.cancelada and not r.ja_estava_cancelada
+
+
+def test_cancelar_ambiguo_nao_e_falha_nem_cancelada(emissor, monkeypatch):
+    from pynfsenacional.sefin import AMBIGUO
+    fake = FakeSefin(evento=RespostaEvento(ok=False, desfecho=AMBIGUO, erro_msg="timeout"))
+    monkeypatch.setattr(emissor, "_sefin_client", lambda: fake)
+    r = emissor.cancelar(CHAVE, justificativa=JUST)
+    assert not r.ok and not r.cancelada and r.ambiguo
+
+
+def test_cancelar_leva_o_prazo_de_90s(emissor, monkeypatch):
+    fake = FakeSefin(evento=RespostaEvento(ok=True, evento_xml="<e/>"))
+    monkeypatch.setattr(emissor, "_sefin_client", lambda: fake)
+    emissor.cancelar(CHAVE, justificativa=JUST)
+    assert fake.evento_kw == {"prazo_s": 90.0}
+    emissor.cancelar(CHAVE, justificativa=JUST, prazo_s=None)
+    assert fake.evento_kw == {}
+
+
+def test_cancelar_chave_de_outro_prestador_nao_toca_a_rede(emissor, monkeypatch):
+    fake = FakeSefin()
+    monkeypatch.setattr(emissor, "_sefin_client", lambda: fake)
+    outra = CHAVE[:9] + "99888777000166" + CHAVE[23:]
+    with pytest.raises(ConfigError, match="outro emitente"):
+        emissor.cancelar(outra, justificativa=JUST)
+    assert fake.evento_enviado is None
+
+
+# ── parametrização pelo Emissor ──────────────────────────────────────────────
+class FakeParam:
+    def __init__(self):
+        self.chamadas = []
+
+    def parametros_convenio(self, mun):
+        self.chamadas.append(("convenio", mun))
+        return {"aderenteAmbienteNacional": 1}
+
+    def aliquotas(self, mun, serv, competencia):
+        self.chamadas.append(("aliquota", mun, serv, competencia))
+        return [{"Aliq": 2.0}]
+
+
+def test_consultar_convenio_usa_o_municipio_do_prestador_ou_o_pedido(emissor, monkeypatch):
+    fake = FakeParam()
+    monkeypatch.setattr(emissor, "_sefin_client", lambda: fake)
+    assert emissor.consultar_convenio() == {"aderenteAmbienteNacional": 1}
+    emissor.consultar_convenio("3550308")
+    assert fake.chamadas == [("convenio", "3304557"), ("convenio", "3550308")]
+
+
+def test_consultar_aliquota_repassa_codigo_competencia_e_municipio(emissor, monkeypatch):
+    fake = FakeParam()
+    monkeypatch.setattr(emissor, "_sefin_client", lambda: fake)
+    assert emissor.consultar_aliquota("07.11.01.000", "2026-11-01") == [{"Aliq": 2.0}]
+    emissor.consultar_aliquota("07.11.01.000", codigo_municipio="3550308")
+    assert fake.chamadas == [("aliquota", "3304557", "07.11.01.000", "2026-11-01"),
+                             ("aliquota", "3550308", "07.11.01.000", None)]
+
+
+# ── o .pfx legado: assinatura e mTLS com o material que o Certificado abriu ──
+def test_assinatura_e_mtls_recebem_os_bytes_do_certificado(emissor, monkeypatch):
+    from pynfsenacional import emissor as mod
+    from pynfsenacional.certificado import Certificado
+    esperado = Certificado(emissor.cfg.certificado).carregar().pkcs12_bytes()
+    vistos = {}
+    real = mod.assinatura.assinar_dps
+
+    def espiao(xml, **kw):
+        vistos["assinatura"] = kw
+        return real(xml, **kw)
+
+    class Cliente:
+        def __init__(self, **kw):
+            vistos["sefin"] = kw
+
+    monkeypatch.setattr(mod.assinatura, "assinar_dps", espiao)
+    monkeypatch.setattr(mod.sefin, "SefinClient", Cliente)
+    emissor._sefin_client()
+    assert vistos["sefin"]["pkcs12_data"] == esperado and "cert_pfx_path" not in vistos["sefin"]
+    fake = FakeSefin(resp=_ok())
+    _emitir(emissor, monkeypatch, fake)
+    assert vistos["assinatura"]["pkcs12_data"] == esperado
+    assert "cert_pfx_path" not in vistos["assinatura"]
