@@ -667,9 +667,16 @@ que cancela em produção): `Id = "PRE" + chave + tipo do evento`; `tpAmb` → `
   SEFIN aceita o pedido por procuração não foi medido).
 - `dhEvento` leva o mesmo recuo do `dhEmi` (§4, E0008).
 - Cancelar de novo uma nota já cancelada volta **E0840** ("o evento de Cancelamento já está
-  vinculado à NFS-e") — medido em homologação. No **direto**, o `Emissor.cancelar` lê o E0840 como
-  a nota que JÁ estava cancelada (`ok`, `cancelada`, `ja_estava_cancelada`, `desfecho=registrado`):
-  é o que acontece na 2ª tentativa depois de uma resposta perdida.
+  vinculado à NFS-e") — medido em homologação. ☠️ **Mas o E0840 não prova o cancelamento:** o
+  e101101 de uma nota que só tem o **pedido de análise** (e101103) volta o MESMO E0840, e a nota
+  segue válida (medido em homologação: depois do e101103 registrado, `GET
+  /nfse/{chave}/eventos/101101/1` deu 404 e `.../101103/1` deu 200). Por isso o `Emissor.cancelar`
+  pergunta à SEFIN (`situacao_cancelamento`): só com um evento que cancela (101101, 105102,
+  105104, 305101) a nota "JÁ estava cancelada"; com o pedido de análise é recusa; com a consulta
+  falhando, ambíguo.
+- Consulta de evento: `GET /nfse/{chave}/eventos/{tipo}/{seq}` → 200 com a lista `eventos` (o
+  `arquivoXml` vem em base64 de base64+gzip); evento inexistente = **404 com corpo JSON**; rota sem
+  o tipo ou o sequencial = 404 em HTML (rota errada, não "não existe"); `GET .../eventos` = 405.
 - ☠️ **O ambíguo não é "falhou".** O pedido é UM POST, sem retentativa. Tempo esgotado depois do
   envio, conexão caída no meio, 5xx sem corpo, 2xx sem o evento: a SEFIN **pode** ter registrado.
   `RespostaEvento.desfecho` separa `registrado` · `recusado` (a SEFIN respondeu e não registrou) ·

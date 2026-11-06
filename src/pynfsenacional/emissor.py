@@ -80,11 +80,14 @@ class ResultadoEvento:
     erro_msg: str | None = None
     erros: list[dict[str, str | None]] = field(default_factory=list)
     # o que aconteceu com o pedido: sefin.REGISTRADO | RECUSADO | NAO_ENVIADO | AMBIGUO.
-    # O E0840 do direto é REGISTRADO: o evento já está na nota (`ja_estava_cancelada`).
+    # O E0840 do direto é REGISTRADO só se a consulta dos eventos achar o cancelamento.
     desfecho: str = sefin.RECUSADO
-    # direto que voltou E0840 ("o evento de Cancelamento já está vinculado à NFS-e"): a nota
-    # JÁ estava cancelada — típico da 2ª tentativa depois de uma resposta perdida.
+    # direto que voltou E0840 e a consulta dos eventos achou o cancelamento: a nota JÁ estava
+    # cancelada — típico da 2ª tentativa depois de uma resposta perdida.
     ja_estava_cancelada: bool = False
+    # no E0840 do direto: o que a consulta dos eventos achou (sefin.CANCELADA, EM_ANALISE,
+    # INDEFERIDA, SEM_CANCELAMENTO) ou None (não houve E0840, ou a consulta falhou).
+    situacao: str | None = None
 
     @property
     def ambiguo(self) -> bool:
@@ -255,9 +258,11 @@ class Emissor:
         Um pedido só, sem retentativa. O `desfecho` separa o que a SEFIN recusou
         (`RECUSADO`), o que nem saiu (`NAO_ENVIADO`) e o que saiu sem resposta (`AMBIGUO`,
         também quando passa de `prazo_s` segundos de relógio): no ambíguo, CONFIRA a nota
-        antes de repetir. No direto, o E0840 ("já vinculado") é a nota que JÁ estava
-        cancelada: `ok=True`, `cancelada=True`, `ja_estava_cancelada=True` e
-        `desfecho=REGISTRADO` (o evento ESTÁ registrado; o código fica em `erro_codigo`).
+        antes de repetir. No direto, o E0840 ("já vinculado") é conferido nos eventos da nota
+        (`situacao`): com um evento que cancela, `ok=True`, `cancelada=True`,
+        `ja_estava_cancelada=True` e `desfecho=REGISTRADO`; só com o pedido de análise (ou a
+        análise indeferida), `ok=False` e `desfecho=RECUSADO` — a nota segue válida; com a
+        consulta falhando, `desfecho=AMBIGUO`.
 
         `conferir_emitente=False` aceita a chave de outro emitente (pedido por procuração,
         autor ≠ emitente) — se a SEFIN aceita, decide ela."""
@@ -278,11 +283,18 @@ class Emissor:
              else cliente.registrar_evento(ch, assinado))
         erro_msg = f"[{r.erro_codigo}] {r.erro_msg}" if r.erro_codigo else r.erro_msg
         if not r.ok and modo == "direto" and r.ja_vinculado:
-            logger.info("cancelamento: a nota já estava cancelada (E0840)")
-            return ResultadoEvento(ok=True, chave_acesso=ch, modo=modo, cancelada=True,
-                                   ja_estava_cancelada=True, erro_codigo=r.erro_codigo,
-                                   erro_msg=erro_msg, erros=r.erros,
-                                   desfecho=sefin.REGISTRADO)
+            sit, explicacao = sefin.conferir_e0840(cliente, ch)
+            logger.info("cancelamento: E0840, situação conferida = %s", sit)
+            if sit == sefin.CANCELADA:
+                return ResultadoEvento(ok=True, chave_acesso=ch, modo=modo, cancelada=True,
+                                       ja_estava_cancelada=True, erro_codigo=r.erro_codigo,
+                                       erro_msg=erro_msg, erros=r.erros,
+                                       desfecho=sefin.REGISTRADO, situacao=sit)
+            return ResultadoEvento(ok=False, chave_acesso=ch, modo=modo,
+                                   erro_codigo=r.erro_codigo,
+                                   erro_msg=f"[{r.erro_codigo}] {explicacao}", erros=r.erros,
+                                   desfecho=sefin.AMBIGUO if sit is None else sefin.RECUSADO,
+                                   situacao=sit)
         if not r.ok:
             logger.warning("evento %s: [%s] %s", r.desfecho, r.erro_codigo, r.erro_msg)
         return ResultadoEvento(

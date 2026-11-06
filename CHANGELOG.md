@@ -17,11 +17,17 @@ pacote passa a instalar uma pilha que assina em qualquer piso declarado.
   `RespostaEvento.desfecho` (e `ResultadoEvento.desfecho`) diz agora `registrado`, `recusado`,
   `nao_enviado` ou `ambiguo` (+ a propriedade `ambiguo`); o `registrar_evento` não levanta mais por
   falha de rede. Sem retentativa automática.
-- **E0840 no cancelamento direto** ("o evento de Cancelamento já está vinculado à NFS-e", a 2ª
-  tentativa depois de uma resposta perdida) vira `ok=True`, `cancelada=True`,
-  `ja_estava_cancelada=True` e `desfecho="registrado"` (o evento ESTÁ na nota; o `E0840` fica em
-  `erro_codigo`) no `Emissor.cancelar`. `RespostaEvento.ja_vinculado` expõe o E0840 a
-  quem usa o `SefinClient` direto.
+- **E0840 no cancelamento direto** ("o evento de Cancelamento já está vinculado à NFS-e") é
+  **conferido nos eventos da nota** antes de qualquer conclusão. ☠️ Medido em homologação: a SEFIN
+  devolve o mesmo E0840 ao e101101 de uma nota que só tem o **pedido de análise** (e101103), que
+  segue válida. Novos `SefinClient.evento_registrado(chave, tipo, seq=1)`,
+  `SefinClient.situacao_cancelamento(chave)` (`cancelada` · `em_analise` · `indeferida` ·
+  `sem_cancelamento`) e `sefin.conferir_e0840(cliente, chave)`. No `Emissor.cancelar`: com um
+  evento que cancela (101101, 105102, 105104, 305101), `ok=True`, `cancelada=True`,
+  `ja_estava_cancelada=True`, `desfecho="registrado"`; sem ele, `ok=False` e
+  `desfecho="recusado"`; com a consulta falhando, `desfecho="ambiguo"`.
+  `ResultadoEvento.situacao` diz o que a consulta achou. `RespostaEvento.ja_vinculado` expõe o
+  E0840 a quem usa o `SefinClient` direto.
 - **O cancelamento tem teto de relógio:** `Emissor.cancelar(..., prazo_s=90)`; estourado, é
   ambíguo. Sem ele, uma resposta que goteja prendia a chamada, porque o `timeout` vale entre bytes.
 - **Justificativa até 255 caracteres**, o `TSMotivo` do XSD de eventos (a lib parava em 200).

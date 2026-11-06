@@ -111,8 +111,22 @@ NAO_ENVIADO = "nao_enviado"  # o pedido não saiu (conexão não abriu): nada ch
 AMBIGUO = "ambiguo"          # saiu e a resposta não veio ou não diz: PODE ter sido registrado
 
 #: E-code da SEFIN para "o evento de Cancelamento já está vinculado à NFS-e" (medido em
-#: homologação, §16): o cancelamento pedido de novo, de uma nota que JÁ está cancelada.
+#: homologação, §16). ☠️ NÃO prova que a nota está cancelada: a SEFIN devolve o mesmo E0840
+#: ao e101101 de uma nota que só tem o PEDIDO DE ANÁLISE (e101103) — medido em homologação.
+#: Para saber, pergunte `SefinClient.situacao_cancelamento`.
 E_EVENTO_JA_VINCULADO = "E0840"
+
+#: Eventos que deixam a nota CANCELADA (tiposEventos v1.01): cancelamento direto, por
+#: substituição, deferido por análise fiscal e por ofício.
+EVENTOS_QUE_CANCELAM = ("101101", "105102", "105104", "305101")
+EVENTO_PEDIDO_ANALISE = "101103"
+EVENTO_ANALISE_INDEFERIDA = "105105"
+
+#: Respostas de `SefinClient.situacao_cancelamento`.
+CANCELADA = "cancelada"            # há um evento que cancela
+EM_ANALISE = "em_analise"          # só o pedido de análise, sem decisão: a nota segue válida
+INDEFERIDA = "indeferida"          # a análise negou o cancelamento: a nota segue válida
+SEM_CANCELAMENTO = "sem_cancelamento"
 
 
 @dataclass
@@ -136,8 +150,35 @@ class RespostaEvento:
 
     @property
     def ja_vinculado(self) -> bool:
-        """True quando a recusa é o E0840: o evento JÁ estava registrado na nota."""
+        """True quando a recusa é o E0840. ☠️ Não quer dizer "cancelada": pode ser só o pedido
+        de análise — confira com `conferir_e0840`."""
         return any(e.get("codigo") == E_EVENTO_JA_VINCULADO for e in self.erros)
+
+
+def conferir_e0840(cliente: SefinClient, chave: str) -> tuple[str | None, str]:
+    """O e101101 voltou E0840: o que a nota TEM? Devolve (situação, explicação), com a situação
+    de `situacao_cancelamento` ou None quando a consulta falhou (aí NÃO SEI se está cancelada).
+
+    ☠️ O E0840 sozinho não prova cancelamento: em homologação ele voltou para uma nota que só
+    tinha o pedido de análise (e101103). Dizer "já estava cancelada" nesse caso marcaria como
+    cancelada uma nota que segue válida."""
+    try:
+        sit = cliente.situacao_cancelamento(chave)
+    except Exception as e:  # noqa: BLE001 — rede, status inesperado: não sei
+        return None, (f"a SEFIN respondeu E0840 (já há um evento de cancelamento vinculado) e a "
+                      f"consulta dos eventos falhou ({e}): NÃO SEI se a nota está cancelada ou em "
+                      f"análise — confira no portal")
+    return sit, {
+        CANCELADA: "a SEFIN respondeu E0840 e a consulta dos eventos confirma: a nota JÁ ESTAVA "
+                   "cancelada",
+        EM_ANALISE: "a SEFIN respondeu E0840, mas a nota NÃO está cancelada: tem um pedido de "
+                    "análise fiscal (e101103) aguardando o município — ela segue válida até o "
+                    "deferimento",
+        INDEFERIDA: "a SEFIN respondeu E0840, mas a nota NÃO está cancelada: o pedido de análise "
+                    "fiscal foi indeferido pelo município — ela segue válida",
+        SEM_CANCELAMENTO: "a SEFIN respondeu E0840, mas a consulta não achou evento de "
+                          "cancelamento nem de análise na nota — confira no portal",
+    }[sit]
 
 
 _RE_COD_SERVICO = re.compile(r"\d{2}\.\d{2}\.\d{2}\.\d{3}")
@@ -382,6 +423,39 @@ class SefinClient:
         if not b64:
             raise RuntimeError("consulta da NFS-e: resposta sem o XML")
         return _descomprimir(b64)
+
+    def evento_registrado(self, chave: str, tipo_evento: str, sequencial: int = 1) -> bool:
+        """GET /nfse/{chave}/eventos/{tipo}/{seq} → True se o evento está registrado na nota.
+
+        404 com corpo JSON = o evento não existe (False). Qualquer outra resposta — inclusive
+        404 sem JSON, que é rota errada, não "não existe" — levanta `RuntimeError`."""
+        r = self._req("GET", f"nfse/{chave}/eventos/{tipo_evento}/{int(sequencial)}",
+                      headers={"Accept": "application/json"})
+        try:
+            dados = r.json()
+        except ValueError:
+            dados = None
+        if r.status_code == 404 and isinstance(dados, dict):
+            return False
+        if r.status_code != 200:
+            raise RuntimeError(_falha_http(r.status_code, f"consulta do evento {tipo_evento}"))
+        if not isinstance(dados, dict) or not isinstance(dados.get("eventos"), list):
+            raise RuntimeError(f"consulta do evento {tipo_evento}: resposta sem a lista de eventos")
+        return len(dados["eventos"]) > 0
+
+    def situacao_cancelamento(self, chave: str) -> str:
+        """A nota está cancelada? Pergunta à SEFIN pelos eventos, em vez de deduzir de um
+        E-code: `CANCELADA` | `EM_ANALISE` | `INDEFERIDA` | `SEM_CANCELAMENTO`.
+
+        Levanta `RuntimeError` quando não dá para saber (rede, status inesperado)."""
+        for tipo in EVENTOS_QUE_CANCELAM:
+            if self.evento_registrado(chave, tipo):
+                return CANCELADA
+        if self.evento_registrado(chave, EVENTO_PEDIDO_ANALISE):
+            if self.evento_registrado(chave, EVENTO_ANALISE_INDEFERIDA):
+                return INDEFERIDA
+            return EM_ANALISE
+        return SEM_CANCELAMENTO
 
     def emitir(self, xml_dps_assinado: str) -> RespostaSefin:
         """gzip+base64 → POST /nfse (mTLS) → parse da NFS-e. Mapeia E-codes em erro_codigo."""
