@@ -27,8 +27,9 @@ def test_dv_errado_rejeitado():
 
 
 def test_regressao_numerica():
-    # CNPJ numérico real: DV inalterado (ASCII-48 == int para dígitos).
-    assert documentos.cnpj_valido("23.629.677/0001-99")
+    # CNPJ numérico (fictício, DV válido): DV inalterado (ASCII-48 == int para dígitos).
+    assert documentos.cnpj_valido("11.222.333/0001-81")
+    assert not documentos.cnpj_valido("11.222.333/0001-82")
     assert not documentos.cnpj_valido("11111111111111")
 
 
