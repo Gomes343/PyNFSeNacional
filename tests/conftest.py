@@ -47,14 +47,22 @@ def config_dict() -> dict[str, Any]:
     return copy.deepcopy(CONFIG_VALIDA)
 
 
-def gerar_pfx_teste(senha: str = "0000", cn: str = "TESTE PYNFSE:11222333000181") -> bytes:
+def san_icp(oid: str, valor: str) -> x509.OtherName:
+    """Um otherName ICP-Brasil da SAN, com o valor como OCTET STRING (como as ACs gravam)."""
+    dados = valor.encode("ascii")
+    return x509.OtherName(x509.ObjectIdentifier(oid), bytes([0x04, len(dados)]) + dados)
+
+
+def gerar_pfx_teste(senha: str = "0000", cn: str = "TESTE PYNFSE:11222333000181",
+                    san: list[x509.GeneralName] | None = None) -> bytes:
     """Gera um .pfx **self-signed descartável** (cifra moderna) para teste.
     NÃO é certificado ICP-Brasil nem tem identidade real — só material de teste.
-    `datetime` é determinístico (sem now()) para não depender do relógio."""
+    `datetime` é determinístico (sem now()) para não depender do relógio. `san`: nomes da
+    extensão SubjectAlternativeName (ex. `san_icp(...)`)."""
     key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
     nome = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, cn)])
     inicio = _dt.datetime(2026, 1, 1, tzinfo=_dt.timezone.utc)
-    cert = (
+    construtor = (
         x509.CertificateBuilder()
         .subject_name(nome)
         .issuer_name(nome)
@@ -62,8 +70,10 @@ def gerar_pfx_teste(senha: str = "0000", cn: str = "TESTE PYNFSE:11222333000181"
         .serial_number(x509.random_serial_number())
         .not_valid_before(inicio)
         .not_valid_after(inicio + _dt.timedelta(days=730))
-        .sign(key, hashes.SHA256())
     )
+    if san:
+        construtor = construtor.add_extension(x509.SubjectAlternativeName(san), critical=False)
+    cert = construtor.sign(key, hashes.SHA256())
     return pkcs12.serialize_key_and_certificates(
         b"pynfse-teste", key, cert, None,
         serialization.BestAvailableEncryption(senha.encode()),
