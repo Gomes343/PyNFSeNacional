@@ -149,13 +149,15 @@ pyproject deles parece engano) só entra para gerar o PDF. Import lazy em `danfs
 **Publicado:** repo em github.com/Gomes343/PyNFSeNacional e pacote no PyPI (`PyNFSeNacionalGT`) —
 release por tag `vX.Y.Z` (PyPI via Trusted Publishing + Release do GitHub, sem token no repo).
 **Em aberto:** (1) endurecimento a partir de mais emissões reais; (2) grupo IBS/CBS do **Simples**
-(01/01/2027): faltam `regApIBSCBSSN`/`cAtvSN` da NT 009, que o esquema ainda não tem, e os casos não
-cobertos do grupo; (3) reportar o classifier de licença errado upstream; (4) trocar o
+(01/01/2027): os campos `regApIBSCBSSN`/`cAtvSN` da NT 009 estão no leiaute `nt009-sn` (17/11/2026,
+só por config, com XSD de teste NÃO oficial em `tests/xsd/nt009-sn/`); falta o pacote oficial de
+esquemas (trocar a pasta e dar ao leiaute a data dele), o optante pendente (`opSimpNac=4`) e os casos
+não cobertos do grupo; (3) reportar o classifier de licença errado upstream; (4) trocar o
 leiaute padrão da produção quando ela virar para o pacote da NT 009; (5) evento de substituição.
 
 Tooling: `pip install -e ".[dev]"` (deps instalam no 3.10–3.14), lock com hashes
 (`requirements-dev.txt`), CI (`.github/workflows/ci.yml`), release por tag (`release.yml`).
-Testes: `pytest` (463 passed, +2 skip locais), `ruff check .`, `mypy --strict` — tudo verde.
+Testes: `pytest` (546 passed, +2 skip locais), `ruff check .`, `mypy --strict` — tudo verde.
 
 ## Regras
 

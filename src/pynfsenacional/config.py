@@ -36,8 +36,23 @@ IBSCBS_CHAVES = ("finNFSe", "indFinal", "cIndOp", "indDest", "CST", "cClassTrib"
 # que a homologação aplica desde 31/10/2026. Sem `leiaute` na config, vale o do ambiente.
 LEIAUTE_PRODUCAO = "20260209"
 LEIAUTE_NT009 = "20261020"
-LEIAUTES = (LEIAUTE_PRODUCAO, LEIAUTE_NT009)
+# O leiaute da NT 009 COM o Simples Nacional (Anexo VI v1.04.01, §8 e §19): o de 20/10 mais o
+# `regApIBSCBSSN` no regTrib e o `cAtvSN` no cServ. Até 17/11/2026 nenhum pacote de esquemas os
+# publicou — nenhum ambiente o aplica, então só entra quando a config o FORÇA. Quando o pacote
+# oficial sair, ele ganha a data do pacote e passa a ser o do ambiente que o aplicar.
+LEIAUTE_NT009_SN = "nt009-sn"
+LEIAUTES = (LEIAUTE_PRODUCAO, LEIAUTE_NT009, LEIAUTE_NT009_SN)
+# Os que têm a ESTRUTURA da NT 009 (finNFSe no infDPS, xDescServ no fim do cServ, CST em trib).
+LEIAUTES_NT009 = (LEIAUTE_NT009, LEIAUTE_NT009_SN)
 _LEIAUTE_DO_AMBIENTE = {"producao": LEIAUTE_PRODUCAO, "homologacao": LEIAUTE_NT009}
+
+# NT 009 §2.4 (Anexo VI v1.04.01): o Simples no IBS/CBS. Valem só para o ME/EPP (opSimpNac=3);
+# a NT prevê também o optante pendente (opSimpNac=4), que esta lib ainda não emite.
+#   regApIBSCBSSN: 1 = IBS e CBS apurados pelo SN · 2 = CBS pelo SN e IBS pelo regime regular
+#                  (quem passou do sublimite) · 3 = IBS e CBS pelo regime regular
+#   cAtvSN: a atividade do Simples (LC 123), só os códigos que cabem numa NFS-e
+REG_AP_IBSCBS_SN = (1, 2, 3)
+ATIVIDADES_SN_NFSE = ("07", "08", "09", "10", "11", "12", "13", "14", "90")
 
 
 def leiaute_do_ambiente(ambiente: str) -> str:
@@ -100,6 +115,9 @@ class Regime:
     opSimpNac: int          # 1=Não Optante · 2=MEI · 3=Optante ME/EPP (Simples)
     regApTribSN: int = 1    # apuração do SN (se optante)
     regEspTrib: int = 0     # regime especial (0=Nenhum)
+    # Regime de apuração do IBS/CBS no Simples (NT 009, §8): 1, 2 ou 3 — ver REG_AP_IBSCBS_SN.
+    # Só o ME/EPP; só vai na DPS no leiaute `nt009-sn`. None = não informado.
+    regApIBSCBSSN: int | None = None
 
 
 @dataclass
@@ -139,6 +157,9 @@ class Servico:
     # aplica; o portal o exige do Regime Regular e ele classifica o serviço para o IBS/CBS (§14).
     # Vazio = elemento omitido (a DPS do Simples sai como sempre saiu).
     cNBS: str = ""
+    # Atividade do Simples (serv/cServ/cAtvSN, NT 009 §8): "07" a "14" ou "90" — ver
+    # ATIVIDADES_SN_NFSE. Só o ME/EPP; só vai na DPS no leiaute `nt009-sn`. Vazio = não informado.
+    cAtvSN: str = ""
     # Grupo IBSCBS da DPS (§8/§14) — só a CLASSIFICAÇÃO; os valores o SEFIN calcula. Chaves:
     # cIndOp, CST, cClassTrib (obrigatórias no bloco), indFinal (opcional), finNFSe e indDest
     # (só "0"). Vazio = grupo omitido — o Simples dispensa o grupo até 31/12/2026.
@@ -279,6 +300,7 @@ class ClienteConfig:
 
         problemas += validar_evento(s.evento, s.cTribNac)
         problemas += self._validar_regime_regular()
+        problemas += validar_simples_ibscbs(r, s, exigir=self.leiaute == LEIAUTE_NT009_SN)
 
         # Ambiente
         if self.ambiente not in _AMBIENTES:
@@ -287,7 +309,7 @@ class ClienteConfig:
             )
         if self.leiaute and self.leiaute not in LEIAUTES:
             problemas.append(
-                f"leiaute inválido: {self.leiaute!r} (use {' ou '.join(LEIAUTES)}, ou deixe vazio "
+                f"leiaute inválido: {self.leiaute!r} (use {', '.join(LEIAUTES)}, ou deixe vazio "
                 "para o do ambiente) — §19"
             )
         return problemas
@@ -432,6 +454,80 @@ class ClienteConfig:
                     "grupo <dest>, que esta biblioteca ainda não emite — §8"
                 )
         return problemas
+
+
+def atividade_sn(valor: Any) -> str:
+    """O `cAtvSN` como a DPS o escreve: 2 dígitos ("7" → "07"); "" quando não informado."""
+    texto = str(valor if valor is not None else "").strip()
+    return texto.zfill(2) if texto.isdigit() else texto
+
+
+# A atividade do Simples amarrada ao item da LC 116 (Anexo VI v1.04.01, RN 451–453): a regra é
+# BICONDICIONAL — o código só vale com o item, e o item só vale com o código.
+def _atividade_do_item(cTribNac: str) -> tuple[str, ...]:
+    item = (cTribNac or "")[:4]
+    if item == "1601":
+        return ("10",)
+    if cTribNac == "990401":
+        return ("11",)
+    if item in ("0702", "0705"):
+        return ("12", "13")
+    return ()
+
+
+def validar_simples_ibscbs(regime: Regime, servico: Servico, exigir: bool = False) -> list[str]:
+    """O Simples no IBS/CBS (NT 009 §2.4, §8): `regApIBSCBSSN` e `cAtvSN`.
+
+    Os dois são do ME/EPP (opSimpNac=3); MEI e Não Optante não os informam. `exigir` = o leiaute
+    da DPS os tem (`nt009-sn`), e aí o ME/EPP é obrigado aos dois (RN 313 e 449). Em leiaute que
+    não os tem, a config pode trazê-los (preparada para a virada) e o montador os omite."""
+    problemas: list[str] = []
+    reg = regime.regApIBSCBSSN
+    atv = atividade_sn(servico.cAtvSN)
+    me_epp = regime.opSimpNac == 3
+    if reg is not None and reg not in REG_AP_IBSCBS_SN:
+        problemas.append(
+            f"regime.regApIBSCBSSN deve ser 1 (IBS e CBS pelo SN), 2 (CBS pelo SN e IBS pelo "
+            f"regime regular) ou 3 (os dois pelo regime regular); recebido {reg!r} — §8"
+        )
+    if atv and atv not in ATIVIDADES_SN_NFSE:
+        problemas.append(
+            f"servico.cAtvSN deve ser um de {', '.join(ATIVIDADES_SN_NFSE)} (atividade do Simples "
+            f"que cabe numa NFS-e); recebido {servico.cAtvSN!r} — §8"
+        )
+    if not me_epp:
+        if reg is not None:
+            problemas.append(
+                "regime.regApIBSCBSSN é só do ME/EPP optante do Simples (opSimpNac=3) — §8"
+            )
+        if atv:
+            problemas.append("servico.cAtvSN é só do ME/EPP optante do Simples (opSimpNac=3) — §8")
+        return problemas
+    if exigir:
+        if reg is None:
+            problemas.append(
+                "regime.regApIBSCBSSN é obrigatório para o ME/EPP no leiaute nt009-sn "
+                "(RN 313 do Anexo VI) — §8"
+            )
+        if not atv:
+            problemas.append(
+                "servico.cAtvSN é obrigatório para o ME/EPP no leiaute nt009-sn "
+                "(RN 449 do Anexo VI) — §8"
+            )
+    if atv and atv in ATIVIDADES_SN_NFSE:
+        exigida = _atividade_do_item(servico.cTribNac)
+        if exigida and atv not in exigida:
+            problemas.append(
+                f"servico.cAtvSN: o item {servico.cTribNac[:2]}.{servico.cTribNac[2:4]} exige a "
+                f"atividade {' ou '.join(exigida)}; recebido {atv} (RN 451–453) — §8"
+            )
+        if not exigida and atv in ("10", "11", "12", "13"):
+            problemas.append(
+                f"servico.cAtvSN {atv} só vale para o seu item da LC 116 (10 = 16.01; "
+                f"11 = 99.04.01; 12 e 13 = 7.02 e 7.05); o cTribNac é {servico.cTribNac!r} "
+                f"(RN 451–453) — §8"
+            )
+    return problemas
 
 
 # TCAtvEvento / TCEnderecoSimples do XSD (os dois leiautes): idAtvEvt (TSIdeEvento) até 30;

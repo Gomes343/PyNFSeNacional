@@ -21,7 +21,9 @@ from . import chave as _chave
 from .certificado import Certificado
 from .config import (
     LEIAUTE_NT009,
+    LEIAUTE_NT009_SN,
     LEIAUTE_PRODUCAO,
+    LEIAUTES_NT009,
     ClienteConfig,
     ConfigError,
     leiaute_do_ambiente,
@@ -100,9 +102,17 @@ def _dica_leiaute(msg: str | None, codigo: str | None, leiaute: str) -> str | No
     """E1235 que cita o `finNFSe` é o SEFIN aplicando o OUTRO pacote do XSD (§19) — o sinal de
     que a produção virou de leiaute antes da lib. A dica diz qual configurar; o `[E1235]` fica
     na frente, porque é por ele que quem chama classifica o erro."""
-    if codigo != "E1235" or not msg or "finNFSe" not in msg:
+    if codigo != "E1235" or not msg:
         return msg
-    outro = LEIAUTE_PRODUCAO if leiaute == LEIAUTE_NT009 else LEIAUTE_NT009
+    # O leiaute nt009-sn (§8) leva regApIBSCBSSN/cAtvSN: num SEFIN cujo esquema ainda não os tem,
+    # o E1235 cita um dos dois — a config forçou o leiaute antes de o ambiente aplicá-lo.
+    if leiaute == LEIAUTE_NT009_SN and ("regApIBSCBSSN" in msg or "cAtvSN" in msg):
+        return (f"{msg} — o SEFIN deste ambiente ainda não aplica os campos do Simples da NT 009 "
+                f"(leiaute {LEIAUTE_NT009_SN}). Configure \"leiaute\": \"{LEIAUTE_NT009}\" até o "
+                f"pacote de esquemas com eles entrar no ar (docs §8)")
+    if "finNFSe" not in msg:
+        return msg
+    outro = LEIAUTE_PRODUCAO if leiaute in LEIAUTES_NT009 else LEIAUTE_NT009
     return (f"{msg} — o SEFIN deste ambiente parece aplicar o leiaute {outro} do XSD; a DPS foi no "
             f"{leiaute}. Configure \"leiaute\": \"{outro}\" (docs §19)")
 

@@ -360,6 +360,40 @@ então a classificação começa pela integral e a redução de cada item (profi
 entra depois, se e quando a contabilidade decidir lançá-la. A lib não escolhe: o `cClassTrib` vem
 da config.
 
+### O Simples no IBS/CBS: `regApIBSCBSSN` e `cAtvSN` (NT 009 §2.4, leiaute `nt009-sn`)
+
+A NT 009 (v1.01, 11/09/2026; leiaute no Anexo VI v1.04.01) criou dois campos para o optante do
+Simples. **Nenhum pacote de esquemas os publicou até 17/11/2026** — nem o de produção (09/02) nem
+o da produção restrita (20/10): mandá-los hoje é E1235. Por isso a lib os emite só no leiaute
+**`nt009-sn`**, que **nenhum ambiente aplica sozinho** e entra quando a config o força
+(`"leiaute": "nt009-sn"`). Quando o pacote oficial sair, o leiaute ganha a data dele e passa a ser
+o do ambiente que o aplicar.
+
+| Campo | Onde | Domínio | Linha do Anexo VI |
+|---|---|---|---|
+| `regApIBSCBSSN` | `prest/regTrib`, depois do `regApTribSN` | 1 = IBS e CBS pelo SN · 2 = CBS pelo SN e IBS pelo regime regular (quem passou do sublimite) · 3 = os dois pelo regime regular | 153 |
+| `cAtvSN` | `serv/cServ`, depois do `cNBS` e antes do `cIntContrib` | 07 a 14 e 90 (a numeração da LC 123, só o que cabe numa NFS-e) | 231 |
+
+Na config: `prestador.regime.regApIBSCBSSN` (inteiro) e `servico.cAtvSN` (texto; `"7"` sai `07`).
+
+As regras de negócio (Anexo VI, aba RN DPS_NFS-e):
+- **RN 313 e 449** — os dois são **obrigatórios** para o ME/EPP (`opSimpNac=3`) e o optante
+  pendente (`4`). MEI e Não Optante não os informam. A lib cobra os dois no `nt009-sn` (no
+  `validar()`, quando a config força o leiaute, e no `montar_dps`).
+- **RN 451–453** — a atividade é **amarrada ao item**, nos dois sentidos: 16.01 ↔ `10`;
+  99.04.01 ↔ `11`; 7.02 e 7.05 ↔ `12` (Anexo III) ou `13` (Anexo IV). O `validar()` recusa a
+  quebra antes do SEFIN.
+- O que o SEFIN **calcula e devolve na NFS-e** (não vai na DPS): `vReceitaBrutaSN`, o grupo
+  `gTribSN` (`pIBSSN`/`vIBSSN`/`pCBSSN`/`vCBSSN`, quando o regime é 1 ou 2) e o `tpRBSN` da
+  classificação tributária.
+
+**Config preparada antes da virada:** nos leiautes de hoje os dois campos ficam de fora da DPS,
+byte a byte — dá para gravá-los já e só trocar o leiaute no dia (`tests/test_simples_ibscbs.py`).
+Se o leiaute for forçado num ambiente que ainda não o tem, o E1235 cita um dos dois e a lib diz
+para voltar ao `20261020`.
+
+O **optante pendente** (`opSimpNac=4`) ainda não é coberto: o validador o recusa.
+
 Ainda **não cobertos** (o validador recusa a config em vez de emitir pela metade): destinatário
 diferente do adquirente (`indDest=1` → grupo `<dest>`), compra governamental (`tpEnteGov`), nota
 de ajuste/referência (`gRefNFSe`), imóvel, redução/diferimento (`gTribRegular`, `gDif`) e crédito
@@ -765,6 +799,10 @@ O resto da NT 009 que o pacote de 20/10 **ainda não tem** (conferido no XSD): `
 `cAtvSN` (regime de apuração do IBS/CBS e atividade do Simples), `opSimpNac=4` (optante pendente),
 `gIBSCBSAjuste` e os tipos das notas de ajuste, `indDest` no `infDPS`, e na NFS-e o `gTribSN` e o
 `vReceitaBrutaSN`. Quando chegarem num pacote novo, entram aqui antes do código.
+
+O `regApIBSCBSSN` e o `cAtvSN` já estão na lib, no leiaute **`nt009-sn`** (só por config; §8). O
+esquema que a suíte usa para ele (`tests/xsd/nt009-sn/`) **não é oficial**: é o de 20/10 com os
+dois elementos nas posições do Anexo VI, para provar a ordem — ver o README de lá.
 
 **Eventos e DF-e não mudaram** entre os pacotes (`pedRegEvento`, `evento`, `tiposEventos` iguais):
 o cancelamento da §16 vale nos dois.

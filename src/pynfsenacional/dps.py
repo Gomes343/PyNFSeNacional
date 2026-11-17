@@ -32,13 +32,16 @@ from lxml import etree
 
 from . import documentos
 from .config import (
-    LEIAUTE_NT009,
+    LEIAUTE_NT009_SN,
     LEIAUTE_PRODUCAO,
     LEIAUTES,
+    LEIAUTES_NT009,
     PTOTTRIB_CHAVES,
     ClienteConfig,
+    atividade_sn,
     leiaute_do_ambiente,
     percentual,
+    validar_simples_ibscbs,
 )
 
 _log = logging.getLogger(__name__)
@@ -169,8 +172,16 @@ def montar_dps(
     p, s, r = cfg.prestador, cfg.servico, cfg.prestador.regime
     leiaute = leiaute or cfg.leiaute or leiaute_do_ambiente(ambiente)
     if leiaute not in LEIAUTES:
-        raise ValueError(f"leiaute inválido: {leiaute!r} (use {' ou '.join(LEIAUTES)}) — §19")
-    nt009 = leiaute == LEIAUTE_NT009
+        raise ValueError(f"leiaute inválido: {leiaute!r} (use {', '.join(LEIAUTES)}) — §19")
+    nt009 = leiaute in LEIAUTES_NT009
+    # O Simples no IBS/CBS (NT 009 §2.4, §8): regApIBSCBSSN e cAtvSN só existem no leiaute
+    # `nt009-sn`. Nele o ME/EPP é obrigado aos dois; nos outros, a config pode trazê-los e eles
+    # ficam de fora (o esquema não os tem — mandar seria E1235).
+    campos_sn = leiaute == LEIAUTE_NT009_SN and r.opSimpNac == 3
+    if campos_sn:
+        problemas_sn = validar_simples_ibscbs(r, s, exigir=True)
+        if problemas_sn:
+            raise ValueError("; ".join(problemas_sn))
     idd = id_dps(cfg, numero, serie)
 
     dps = etree.Element(f"{{{NS}}}DPS", nsmap={None: NS})
@@ -211,6 +222,8 @@ def montar_dps(
     # pode vazar para quem não é ME/EPP (§3).
     if r.opSimpNac == 3 and r.regApTribSN is not None:
         _el(reg, "regApTribSN", str(r.regApTribSN))
+    if campos_sn:
+        _el(reg, "regApIBSCBSSN", str(r.regApIBSCBSSN))
     _el(reg, "regEspTrib", str(r.regEspTrib))
 
     # Tomador (opcional): só com documento; identificado EXIGE xNome (§7).
@@ -255,6 +268,9 @@ def montar_dps(
     nbs = documentos.digitos(s.cNBS)
     if nbs:
         _el(cserv, "cNBS", nbs)
+    # cAtvSN (Anexo VI v1.04.01): depois do cNBS, antes do cIntContrib e do xDescServ.
+    if campos_sn:
+        _el(cserv, "cAtvSN", atividade_sn(s.cAtvSN))
     if nt009:
         _el(cserv, "xDescServ", desc)
     # atvEvento (0-1), depois de comExt/obra (que não emitimos) e antes do infoCompl. Obrigatório
@@ -367,7 +383,7 @@ def _montar_ibscbs(
             raise ValueError(f"servico.ibscbs.{chave} é obrigatório no grupo IBS/CBS")
         return v
 
-    nt009 = leiaute == LEIAUTE_NT009
+    nt009 = leiaute in LEIAUTES_NT009
     g = _el(inf, "IBSCBS")
     if not nt009:
         _el(g, "finNFSe", _fin_nfse(ibs))

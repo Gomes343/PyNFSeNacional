@@ -218,9 +218,12 @@ Cada prestador é descrito por um **JSON puro**. Comece copiando o exemplo anota
     // "ibscbs": {"cIndOp": "050101", "CST": "000", "cClassTrib": "000001", "indFinal": "0"}
                                         //   grupo IBS/CBS — obrigatório no Regime Regular (§8);
                                         //   exige o cNBS (E0322)
+    // "cAtvSN": "07"                   //   atividade do Simples (ME/EPP, NT 009 — §8); vai
+                                        //   na DPS só no leiaute "nt009-sn"
   }
   // "leiaute": "20261020"              //   pacote do XSD (§19). Vazio = o do ambiente:
-                                        //   homologação 20261020 (NT 009), produção 20260209
+                                        //   homologação 20261020 (NT 009), produção 20260209;
+                                        //   "nt009-sn" = NT 009 com o Simples (§8), só forçado
 }
 ```
 
@@ -294,9 +297,12 @@ config (JSON)  →  montar DPS (XML)  →  assinar (XMLDSIG)  →  gzip+base64 �
 - ✅ **NT 009 — os dois leiautes do XSD** (produção 09/02/2026 e NT 009 de 20/10/2026, que a
   homologação já aplica), escolhidos pelo ambiente; o grupo IBS/CBS do **Simples** autorizado em
   homologação — v1.3.0, em testes até a produção virar
-- ⏳ Os campos do Simples da NT 009 (`regApIBSCBSSN`, `cAtvSN`) quando entrarem no esquema; o grupo
-  IBS/CBS do Simples é obrigatório a partir de 01/01/2027 (Ato Conjunto RFB/CGIBS nº 4/2026). E os
-  casos ainda não cobertos do grupo: destinatário ≠ adquirente, compra governamental
+- ✅ Os campos do Simples da NT 009 (`regApIBSCBSSN`, `cAtvSN`), com as regras de negócio do
+  Anexo VI — no leiaute `nt009-sn`, só por config, até o pacote oficial de esquemas os trazer
+  (o grupo IBS/CBS do Simples é obrigatório a partir de 01/01/2027, Ato Conjunto RFB/CGIBS
+  nº 4/2026 e nº 7/2026)
+- ⏳ Optante pendente (`opSimpNac=4`) e os casos ainda não cobertos do grupo: destinatário ≠
+  adquirente, compra governamental
 - ⏳ Tomador estrangeiro / sem documento
 - ✅ **Cancelamento** (e101101 direto / e101103 análise fiscal), **consulta pela chave** e
   **distribuição DF-e** por NSU; valor em `Decimal`; certificado do servidor conferido — v1.2.0

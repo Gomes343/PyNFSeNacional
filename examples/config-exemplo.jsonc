@@ -27,6 +27,9 @@
       "regApTribSN": 1,                       //   apuração do SN — só ME/EPP (opSimpNac=3);
                                               //   Não Optante e MEI: omitido pelo motor (E0162)
       "regEspTrib": 0                         //   0=Nenhum
+      // , "regApIBSCBSSN": 1                 //   NT 009 (§8): IBS/CBS apurados pelo SN (1),
+      //                                      //   só a CBS (2) ou nenhum (3) — ME/EPP; vai na
+      //                                      //   DPS só no leiaute "nt009-sn"
     }
     // nome/endereço do prestador NÃO entram aqui: o SEFIN puxa do cadastro (E0128/E0121)
   },
@@ -60,7 +63,9 @@
     //   "CST": "000",                        //   Regular desde 01/10/2026; Simples a partir de
     //   "cClassTrib": "000001",              //   01/01/2027
     //   "indFinal": "0"
-    // }
+    // },
+    // "cAtvSN": "07"                         //   NT 009 (§8): atividade do Simples (07–14, 90);
+    //                                        //   ME/EPP, só no leiaute "nt009-sn"
   },
 
   "dados_nota": {                             // EXEMPLO p/ teste manual; em uso real os dados

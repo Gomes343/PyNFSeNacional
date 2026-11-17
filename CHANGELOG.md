@@ -5,6 +5,18 @@ versionamento [SemVer](https://semver.org/lang/pt-BR/).
 
 ## [Não publicado]
 
+### Adicionado
+- **O Simples no IBS/CBS (NT 009 §2.4).** `prestador.regime.regApIBSCBSSN` (1, 2 ou 3) e
+  `servico.cAtvSN` (07–14, 90), com as regras de negócio do Anexo VI v1.04.01: obrigatórios para o
+  ME/EPP (RN 313 e 449), só do ME/EPP, e a atividade amarrada ao item nos dois sentidos (16.01 ↔ 10,
+  99.04.01 ↔ 11, 7.02/7.05 ↔ 12 ou 13 — RN 451–453). Entram na DPS no leiaute novo
+  **`nt009-sn`** (`LEIAUTE_NT009_SN`), que nenhum ambiente aplica sozinho: o esquema oficial com os
+  dois campos ainda não saiu, então ele só vale quando a config o força. Nos leiautes de hoje a
+  config pode trazê-los e a DPS sai igual, byte a byte. `validar_simples_ibscbs`, `atividade_sn`,
+  `REG_AP_IBSCBS_SN`, `ATIVIDADES_SN_NFSE` e `LEIAUTES_NT009` públicos.
+- Dica no E1235 que cita `regApIBSCBSSN`/`cAtvSN` com o leiaute `nt009-sn`: o ambiente ainda não o
+  aplica, configure `20261020`.
+
 ## [1.7.0] - 2026-11-06
 
 Revisão de robustez: o que é ambíguo ou demorado deixa de parecer falha (ou sucesso), e o

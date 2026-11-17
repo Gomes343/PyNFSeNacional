@@ -20,6 +20,7 @@ from test_regime_regular import REGULAR, TOMADOR_PJ
 from pynfsenacional import dps
 from pynfsenacional.config import (
     LEIAUTE_NT009,
+    LEIAUTE_NT009_SN,
     LEIAUTE_PRODUCAO,
     LEIAUTES,
     ClienteConfig,
@@ -110,9 +111,18 @@ TOMADORES = {
 }
 
 
+def _com_campos_sn(d: dict[str, Any], leiaute: str) -> dict[str, Any]:
+    """No leiaute nt009-sn o ME/EPP é obrigado ao regApIBSCBSSN e ao cAtvSN (§8)."""
+    if leiaute == LEIAUTE_NT009_SN and d["prestador"]["regime"]["opSimpNac"] == 3:
+        d["prestador"]["regime"]["regApIBSCBSSN"] = 1
+        d["servico"]["cAtvSN"] = "07"
+    return d
+
+
 def _montar(cfg: str, tomador: str, leiaute: str, ambiente: str = "producao") -> str:
     return dps.montar_dps(
-        ClienteConfig.from_dict(copy.deepcopy(CONFIGS[cfg])), numero="12", serie="70000",
+        ClienteConfig.from_dict(_com_campos_sn(copy.deepcopy(CONFIGS[cfg]), leiaute)),
+        numero="12", serie="70000",
         valor="1262.90", descricao="Servico de teste", tomador=TOMADORES[tomador],
         ambiente=ambiente, dh_emi="2026-10-31T10:00:00-03:00", d_comp="2026-10-31",
         leiaute=leiaute,
@@ -202,7 +212,8 @@ def test_cnpj_alfanumerico_so_passa_no_esquema_da_nt009():
     d["prestador"]["cnpj"] = "12ABC34501DE35"
     cfg = ClienteConfig.from_dict(d)
     xml = {lt: dps.montar_dps(cfg, numero="1", valor="1", descricao="x", tomador=None,
-                              ambiente="producao", leiaute=lt) for lt in LEIAUTES}
+                              ambiente="producao", leiaute=lt)
+           for lt in (LEIAUTE_PRODUCAO, LEIAUTE_NT009)}
     assert _erros(xml[LEIAUTE_NT009], LEIAUTE_NT009) == []
     assert _erros(xml[LEIAUTE_PRODUCAO], LEIAUTE_PRODUCAO) != []
 
