@@ -24,7 +24,7 @@ from .emissor import Emissor, Nota, ResultadoEvento
 #: Fonte única da versão (o pyproject a lê daqui, por `[tool.hatch.version]`). Até a 1.6.0 ela
 #: vinha do metadado instalado — e uma instalação EDITÁVEL feita na 1.0.0 seguia dizendo 1.0.0
 #: enquanto rodava o código novo.
-__version__ = "1.7.0"
+__version__ = "1.8.0"
 
 __all__ = ["Emissor", "Nota", "ResultadoEvento", "ClienteConfig", "ConfigError",
            "DocumentoDfe", "RespostaDfe", "__version__"]

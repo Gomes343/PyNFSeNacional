@@ -5,6 +5,14 @@ versionamento [SemVer](https://semver.org/lang/pt-BR/).
 
 ## [Não publicado]
 
+## [1.8.0] - 2026-11-17
+
+O Simples Nacional no IBS/CBS, para 01/01/2027. A NFS-e do optante do Simples passa a exigir o
+grupo IBS/CBS nessa data (Atos Conjuntos RFB/CGIBS nº 4 e nº 7/2026), e a NT 009 criou para ele
+dois campos que nenhum pacote oficial de esquemas publicou até aqui. A lib já os monta e confere
+pelas regras do Anexo VI; eles ficam atrás de um leiaute que só entra quando a config o pede, então
+nenhuma DPS de hoje muda.
+
 ### Adicionado
 - **O Simples no IBS/CBS (NT 009 §2.4).** `prestador.regime.regApIBSCBSSN` (1, 2 ou 3) e
   `servico.cAtvSN` (07–14, 90), com as regras de negócio do Anexo VI v1.04.01: obrigatórios para o

@@ -108,6 +108,9 @@ ponta a ponta: **validar → montar DPS → assinar → transporte mTLS → Nota
   e `Emissor.sincronizar_dfe` (`dfe.py`, caixa postal do ADN por NSU). Validados ao vivo em
   homologação. O contador de nDPS deixou de travar no `ja_emitida` (compara valor + tomador da
   nota achada) e o valor passou a `Decimal`. Regra em `docs/conhecimento-fiscal.md` §5, §16–§18.
+- **1.8.0 (17/11/2026) — o Simples no IBS/CBS (NT 009 §2.4):** `regime.regApIBSCBSSN` e
+  `servico.cAtvSN`, com as RN 313, 449 e 451–453 do Anexo VI, no leiaute `nt009-sn` (só por config;
+  nos outros a DPS não muda). Regra em `docs/conhecimento-fiscal.md` §8 e §19.
 - **1.7.0 (06/11/2026) — robustez (revisão adversarial):** o pedido de evento tem `desfecho`
   (`registrado`/`recusado`/`nao_enviado`/`ambiguo`) e não levanta por rede; E0840 no direto = já
   cancelada; teto de relógio (`prazo_s`) no cancelamento e na caixa DF-e (que grava por página,
