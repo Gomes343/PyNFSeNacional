@@ -601,6 +601,9 @@ def validar_tomador(tomador: dict[str, Any] | None) -> list[str]:
     documento válido (mód-11)."""
     if not tomador:
         return []
+    from . import exterior  # import tardio: exterior → documentos, sem ciclo com config
+    if exterior.tomador_do_exterior(tomador):
+        return exterior.validar_tomador_exterior(tomador)   # §22
     # CNPJ alfanumérico do tomador: preserva letras (CPF, só dígitos, sai igual).
     doc = documentos.norm_documento(
         tomador.get("cpf_cnpj") or tomador.get("cpf") or tomador.get("cnpj")

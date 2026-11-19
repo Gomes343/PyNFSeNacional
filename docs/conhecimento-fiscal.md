@@ -279,7 +279,7 @@ contribuinte é operação de município — o prestador recebe 404). Consequên
   do XSD: **`IM → end → fone → email`** (trocar a ordem = E1235). O `<end>` nacional é **bloco
   atômico** (tudo-ou-nada): `endNac(cMun 7díg, CEP 8díg) → xLgr → nro → xCpl? → xBairro`; faltando
   qualquer obrigatório (cMun/CEP/logradouro/bairro), omite o endereço inteiro. `fone` = só dígitos;
-  `email` ≤ 80. Endereço no exterior (`endExt`) ainda não coberto.
+  `email` ≤ 80. O tomador do **exterior** (`NIF`/`cNaoNIF` + `endExt`) está no §22.
 - **Consumidor final / não identificado** → omitir o bloco `<toma>` por completo.
 
 ---
@@ -862,3 +862,48 @@ JSON e qualquer outro status levantam `RuntimeError` — "não deu para saber" n
 A entrada é conferida antes do GET (`ValueError`): município com 7 dígitos, código `00.00.00.000`,
 competência `AAAA-MM-DD` — um código sem pontos virava "alíquotas não encontradas". A `mensagem` do
 ADN fica em `SefinClient.ultima_mensagem_adn`.
+
+## 22. ★ Tomador no exterior, comércio exterior e exportação de serviço
+
+Regras do **Anexo I v1.01 (09/02/2026)**, aba "RN DPS_NFS-e", e a DPS que o Emissor Web monta e o
+SEFIN autorizou para dois prestadores do Simples: uma **exportação** (tomador com NIF, modo 4,
+`tribISSQN=3`) e um tomador **sem NIF** com o ISS tributável (modo 1). A sequência de elementos que
+a lib monta é a dessas duas notas.
+
+**O tomador (`toma`)** — no lugar do CPF/CNPJ (choice do `TCInfoPessoa`):
+- `NIF`: o número fiscal do país dele, 1–40 posições, sem normalizar (cada país tem o seu).
+- ou `cNaoNIF`: **1** dispensado do NIF · **2** não exigência. O **0** ("não informado na nota de
+  origem") é só do compartilhamento município → ADN: na SEFIN é **E0226**.
+- `xNome` obrigatório (**E0233**). `IM` não vai (é inscrição municipal brasileira).
+- `end/endExt` obrigatório com NIF (**E0242**; na NT 009, também com o `cNaoNIF`):
+  `endExt(cPais ISO2 ≠ BR — E0246, cEndPost ≤ 11, xCidade ≤ 60, xEstProvReg ≤ 60) → xLgr → nro →
+  xCpl? → xBairro`. O `xBairro` é obrigatório no esquema mesmo fora do Brasil (o ISSNET repete o
+  logradouro). A lib **recusa** antes o endereço incompleto, em vez de omitir.
+
+**O grupo `serv/comExt`** — depois do `cServ`, antes de `obra`/`atvEvento`/`infoCompl`.
+**Obrigatório** com tomador no exterior ou `tribISSQN=3` (**E0330**), e o `cNBS` também (**E0318**):
+`mdPrestacao` (1 transfronteiriço · 2 consumo no Brasil · 3 movimento temporário de PF · 4 consumo
+no exterior; 0 é **E0333**) → `vincPrest` (0 sem vínculo) → `tpMoeda` (BACEN, 3 díg: 220 dólar dos
+EUA, 978 euro) → `vServMoeda` → `mecAFComexP` (01 nenhum; 00 é **E0341**) → `mecAFComexT` (01; 00 é
+**E0343**) → `movTempBens` (1 não; 0 é **E0345**; 1 proíbe `nDI`/`nRE` — **E0354**; 2 exige `nDI` —
+**E0352**; 3 exige `nRE` — **E0356**) → `nDI?` → `nRE?` → `mdic` (0 não enviar). O Emissor Web usa
+vínculo 0, mecanismos 01, bens 1 e MDIC 0 — são os padrões da lib.
+⚠️ Na NT 009 o `nDI` vira `nDUIMP` e o `nRE`, `nDUE`, e entram `nFatura`/`vFatura`/`nContCambio`
+(opcionais). A lib monta o de hoje; com `mov_temp_bens=1` (o caso do serviço) não há diferença.
+
+**A exportação (`tribMun`)** — `tribISSQN=3` e, logo depois, `cPaisResult` (ISO2), o país onde o
+resultado se verifica. Com a prestação no Brasil e a incidência no estabelecimento do prestador, o
+`cPaisResult` é **obrigatório** (**E0590**) e fora desses cenários é **proibido** (**E0591**). O
+tomador do Brasil **também** pode exportar (cenários 2 e 30 da aba EXPORTACAO_EMISSÃO_NFS-e): aí o
+país vem declarado. Com a prestação no Brasil e a incidência no LOCAL da prestação, o `tribISSQN=3` é
+**E0529**; com a prestação no exterior, o `tribISSQN=1` é **E0530** (o `cPaisPrestacao` a lib não
+monta). Exportação não tem ISS retido.
+
+**Na lib:** o tomador leva `nif` ou `motivo_sem_nif` e o `endereco` com `pais`, `codigo_postal`,
+`cidade`, `estado`, logradouro, numero, complemento, bairro. A nota leva
+`comercio_exterior={"modo_prestacao", "moeda", "valor_moeda", "exportacao": True,
+"pais_resultado"?}` em `Emissor.emitir`/`montar_dps` (o país do resultado cai no do endereço do
+tomador quando não vem). `tributos.tribISSQN=3` na config dá a mesma DPS que `exportacao=True`.
+Leitura única em `exterior.py`; a nota achada na SEFIN se compara pelo NIF (`"NIF:<nif>"`), nunca
+contra um CPF/CNPJ de mesmos dígitos. Testes: `tests/test_exterior.py` (os dois XSDs).
+

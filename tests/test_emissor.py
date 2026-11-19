@@ -217,9 +217,10 @@ def _xml_toma(tag, doc, valor="150.00"):
     (_xml_toma("CNPJ", CNPJ_TOMADOR), {"cnpj": "52.998.224/0001-00"}, False),
     # `documento` não vai à DPS (sai sem <toma>): comparar com ele dava False à própria nota
     (nfse_xml(doc=None), {"documento": CPF_TOMADOR}, True),
-    # NIF: a DPS desta lib ainda não monta <NIF> — o tomador só com NIF sai sem <toma>…
-    (nfse_xml(doc=None), {"nif": "3101234567"}, True),
-    # …e uma NFS-e de OUTRO emissor, com tomador do exterior, não é a nota sem tomador
+    # NIF (§22, 1.9.0): a DPS monta <toma><NIF>, então a nota sem tomador não é a dele…
+    (nfse_xml(doc=None), {"nif": "3101234567"}, False),
+    (_xml_toma("NIF", "3101234567"), {"nif": "3101234567", "nome": "X"}, True),
+    # …e uma NFS-e com tomador do exterior não é a nota sem tomador
     (_xml_toma("NIF", "3101234567"), None, False),
     (_xml_toma("NIF", "3101234567"), TOMADOR, False),
 ])

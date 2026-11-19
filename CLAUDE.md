@@ -108,6 +108,10 @@ ponta a ponta: **validar → montar DPS → assinar → transporte mTLS → Nota
   e `Emissor.sincronizar_dfe` (`dfe.py`, caixa postal do ADN por NSU). Validados ao vivo em
   homologação. O contador de nDPS deixou de travar no `ja_emitida` (compara valor + tomador da
   nota achada) e o valor passou a `Decimal`. Regra em `docs/conhecimento-fiscal.md` §5, §16–§18.
+- **Não publicado (19/11/2026) — tomador no exterior e exportação de serviço:** `nif`/`motivo_sem_nif`
+  + `endExt` no tomador, `comercio_exterior` por nota (`serv/comExt`) e `tribISSQN=3` com
+  `cPaisResult`, validados pelo Anexo I v1.01; sequência conferida contra duas notas reais do Emissor
+  Web. Módulo `exterior.py`, regra em `docs/conhecimento-fiscal.md` §22, `tests/test_exterior.py`.
 - **1.8.0 (17/11/2026) — o Simples no IBS/CBS (NT 009 §2.4):** `regime.regApIBSCBSSN` e
   `servico.cAtvSN`, com as RN 313, 449 e 451–453 do Anexo VI, no leiaute `nt009-sn` (só por config;
   nos outros a DPS não muda). Regra em `docs/conhecimento-fiscal.md` §8 e §19.
@@ -160,7 +164,7 @@ leiaute padrão da produção quando ela virar para o pacote da NT 009; (5) even
 
 Tooling: `pip install -e ".[dev]"` (deps instalam no 3.10–3.14), lock com hashes
 (`requirements-dev.txt`), CI (`.github/workflows/ci.yml`), release por tag (`release.yml`).
-Testes: `pytest` (546 passed, +2 skip locais), `ruff check .`, `mypy --strict` — tudo verde.
+Testes: `pytest` (passa inteiro, +2 skip locais), `ruff check .`, `mypy --strict` — tudo verde.
 
 ## Regras
 

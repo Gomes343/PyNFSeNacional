@@ -30,7 +30,7 @@ from typing import Any
 
 from lxml import etree
 
-from . import documentos
+from . import documentos, exterior
 from .config import (
     LEIAUTE_NT009_SN,
     LEIAUTE_PRODUCAO,
@@ -110,8 +110,8 @@ def documento_tomador(tomador: dict[str, Any] | None) -> str:
     pedida (``emissor.mesma_nota``) tem de ler o tomador como a DPS o escreve, senão a nota
     pedida parece outra (e o contador pula o número dela) ou outra parece a pedida.
 
-    ⚠️ ``nif`` (tomador do exterior) não entra: a DPS desta lib ainda não monta ``<NIF>``, e um
-    tomador só com NIF sai SEM ``<toma>``."""
+    O tomador do exterior (``nif``/``motivo_sem_nif``) não tem CPF/CNPJ: devolve "" e a
+    identificação dele é ``exterior.identificacao`` (§22)."""
     tom = tomador or {}
     return documentos.norm_documento(tom.get("cpf_cnpj") or tom.get("cpf") or tom.get("cnpj"))
 
@@ -122,8 +122,8 @@ def _montar_end_toma(toma: etree._Element, end: Any) -> None:
 
     BLOCO ATÔMICO (tudo-ou-nada): se faltar qualquer obrigatório (cMun 7 díg, CEP 8 díg,
     logradouro, bairro), OMITE o endereço inteiro — um bloco parcial é E1235. Mesma regra
-    da implementação de referência em PHP. ``nro`` cai para 'S/N' quando vazio. Endereço no
-    exterior (``endExt``) não é coberto aqui.
+    da implementação de referência em PHP. ``nro`` cai para 'S/N' quando vazio. O endereço no
+    exterior (``endExt``) é o ``_montar_end_ext``.
 
     A omissão é REGISTRADA em log (nível WARNING, só os NOMES dos campos que faltaram — nunca
     o valor): descartar o endereço em silêncio faz a nota sair "com sucesso" sem o dado que o
@@ -151,11 +151,35 @@ def _montar_end_toma(toma: etree._Element, end: Any) -> None:
     _el(el_end, "xBairro", campos["xBairro"][:60])
 
 
+def _montar_end_ext(toma: etree._Element, end: Any) -> None:
+    """``<end>`` do tomador do EXTERIOR (§22): ``endExt(cPais, cEndPost, xCidade, xEstProvReg) →
+    xLgr → nro → xCpl? → xBairro``. Tudo-ou-nada como o nacional; o ``validar_tomador`` já
+    recusa o incompleto antes, então chegar aqui incompleto só loga e omite."""
+    if not isinstance(end, dict) or not end:
+        return
+    campos, faltando = exterior.endereco_exterior(end)
+    if faltando:
+        _log.warning("endereço do tomador do exterior OMITIDO da DPS: faltam %s",
+                     ", ".join(faltando))
+        return
+    el_end = _el(toma, "end")
+    ext = _el(el_end, "endExt")
+    _el(ext, "cPais", campos["cPais"])
+    _el(ext, "cEndPost", campos["cEndPost"][:11])
+    _el(ext, "xCidade", campos["xCidade"][:60])
+    _el(ext, "xEstProvReg", campos["xEstProvReg"][:60])
+    _el(el_end, "xLgr", campos["xLgr"][:255])
+    _el(el_end, "nro", campos["nro"][:60])
+    if campos["xCpl"]:
+        _el(el_end, "xCpl", campos["xCpl"][:156])
+    _el(el_end, "xBairro", campos["xBairro"][:60])
+
+
 def montar_dps(
     cfg: ClienteConfig, *, numero: str, valor: Decimal | float | int | str, descricao: str,
     tomador: dict[str, Any] | None, ambiente: str, serie: str = "1",
     dh_emi: str | None = None, d_comp: str | None = None, ver_aplic: str | None = None,
-    leiaute: str | None = None,
+    leiaute: str | None = None, comercio_exterior: dict[str, Any] | None = None,
 ) -> str:
     """Monta o XML da DPS (string, NÃO assinado) a partir da config + dados da emissão.
 
@@ -166,6 +190,13 @@ def montar_dps(
     `dh_emi`/`d_comp`/`ver_aplic`: injetáveis (default = relógio de Brasília / constante);
     o golden passa valores fixos para o byte-diff ser determinístico.
     `leiaute`: pacote do XSD (§19) — None = `cfg.leiaute`, e vazio nela = o do ambiente.
+    Tomador do EXTERIOR (§22): "nif" OU "motivo_sem_nif" (0/1/2) no lugar do CPF/CNPJ, e o
+        "endereco" com "pais" (ISO), "codigo_postal", "cidade", "estado", logradouro, numero,
+        complemento, bairro.
+    `comercio_exterior` (§22): o grupo serv/comExt desta nota — "modo_prestacao", "moeda"
+        (BACEN), "valor_moeda" e, com padrão, "vinculo", "mec_prestador", "mec_tomador",
+        "mov_temp_bens", "mdic". Com "exportacao": True, o ISS sai tribISSQN=3 com o
+        cPaisResult ("pais_resultado" ou o país do endereço do tomador). None = sem comExt.
     """
     from . import relogio  # import tardio: relogio é infra, evita ciclo conceitual
 
@@ -234,16 +265,25 @@ def montar_dps(
     tom = tomador or {}
     # CNPJ alfanumérico do tomador: preserva letras; CPF (só dígitos) sai igual.
     doc = documento_tomador(tom)
-    if doc:
+    do_exterior = not doc and exterior.tomador_do_exterior(tom)
+    if doc or do_exterior:
         toma = _el(inf, "toma")
-        _el(toma, "CNPJ" if len(doc) == 14 else "CPF", doc)
+        if doc:
+            _el(toma, "CNPJ" if len(doc) == 14 else "CPF", doc)
+        elif exterior.nif(tom):
+            _el(toma, "NIF", exterior.nif(tom)[:40])
+        else:
+            _el(toma, "cNaoNIF", exterior.motivo_sem_nif(tom))
         im = documentos.digitos(tom.get("im") or tom.get("inscricao_municipal"))
-        if im:
+        if im and doc:
             _el(toma, "IM", im)
         nome = (tom.get("nome") or tom.get("xNome") or "").strip()
         if nome:
             _el(toma, "xNome", nome)
-        _montar_end_toma(toma, tom.get("endereco") or tom.get("end"))
+        if do_exterior:
+            _montar_end_ext(toma, tom.get("endereco") or tom.get("end"))
+        else:
+            _montar_end_toma(toma, tom.get("endereco") or tom.get("end"))
         fone = documentos.digitos(tom.get("fone") or tom.get("telefone"))
         if fone:
             _el(toma, "fone", fone)
@@ -273,7 +313,18 @@ def montar_dps(
         _el(cserv, "cAtvSN", atividade_sn(s.cAtvSN))
     if nt009:
         _el(cserv, "xDescServ", desc)
-    # atvEvento (0-1), depois de comExt/obra (que não emitimos) e antes do infoCompl. Obrigatório
+    # comExt (0-1): logo depois do cServ, antes de obra/atvEvento (TCServ, §22).
+    if comercio_exterior:
+        c = exterior.comext(comercio_exterior)
+        ce = _el(serv, "comExt")
+        for tag in ("mdPrestacao", "vincPrest", "tpMoeda", "vServMoeda", "mecAFComexP",
+                    "mecAFComexT", "movTempBens"):
+            _el(ce, tag, c[tag])
+        for tag in ("nDI", "nRE"):
+            if c[tag]:
+                _el(ce, tag, c[tag])
+        _el(ce, "mdic", c["mdic"])
+    # atvEvento (0-1), depois de comExt/obra (obra não emitimos) e antes do infoCompl. Obrigatório
     # no item 12 (E0390); o local é UM dos dois — idAtvEvt OU end (TCEnderecoSimples).
     ev = s.evento or {}
     if ev:
@@ -309,7 +360,12 @@ def montar_dps(
     _el(vsp, "vServ", str(valor_decimal(valor)))
     trib = _el(valores, "trib")
     tm = _el(trib, "tribMun")
-    _el(tm, "tribISSQN", str(s.tributos.get("tribISSQN", 1)))
+    # Exportação de serviço (§22): tribISSQN=3 e, logo depois, o país do resultado.
+    if comercio_exterior and exterior.exportacao(comercio_exterior, s.tributos):
+        _el(tm, "tribISSQN", "3")
+        _el(tm, "cPaisResult", exterior.pais_resultado(comercio_exterior, tom))
+    else:
+        _el(tm, "tribISSQN", str(s.tributos.get("tribISSQN", 1)))
     _el(tm, "tpRetISSQN", str(s.tributos.get("tpRetISSQN", 1)))
     # pAliq (opt-in): ME/EPP com ISS pelo Simples e ISS RETIDO exige a alíquota do município na DPS
     # (E0621/E0628). Só vai quando o chamador a informa em `tributos.pAliq`; é o último filho do

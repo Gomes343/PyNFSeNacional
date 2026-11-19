@@ -5,6 +5,20 @@ versionamento [SemVer](https://semver.org/lang/pt-BR/).
 
 ## [Não publicado]
 
+### Adicionado
+- **Tomador no exterior e exportação de serviço (§22).** O tomador se identifica por `nif` ou
+  `motivo_sem_nif` (1 dispensado, 2 não exigido) com o endereço no exterior (`endExt`); a nota leva
+  `comercio_exterior` (grupo `serv/comExt`: modo de prestação, moeda BACEN e valor nela, com os
+  padrões do Emissor Web) e, com `exportacao=True` ou `tributos.tribISSQN=3`, o ISS sai como
+  exportação com o `cPaisResult`. Validação pelas regras do Anexo I v1.01 (E0226, E0233, E0242,
+  E0318, E0330, E0333, E0341, E0343, E0345, E0352, E0354, E0356, E0590). `Emissor.emitir` e
+  `montar_dps` ganham o parâmetro `comercio_exterior`; módulo novo `exterior`. Sem esses dados a DPS
+  sai idêntica, byte a byte.
+
+### Mudado
+- `mesma_nota` compara o tomador do exterior pelo NIF. Até aqui o tomador só com NIF saía sem
+  `<toma>`, e uma nota sem tomador contava como a dele.
+
 ## [1.8.0] - 2026-11-17
 
 O Simples Nacional no IBS/CBS, para 01/01/2027. A NFS-e do optante do Simples passa a exigir o

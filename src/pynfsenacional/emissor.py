@@ -16,7 +16,7 @@ from typing import Any
 
 from lxml import etree
 
-from . import assinatura, dfe, documentos, dps, eventos, sefin
+from . import assinatura, dfe, documentos, dps, eventos, exterior, sefin
 from . import chave as _chave
 from .certificado import Certificado
 from .config import (
@@ -144,12 +144,17 @@ def mesma_nota(nfse_xml: str | None, valor: Any, tomador: dict[str, Any] | None)
     toma = raiz.find(".//{*}toma")
     doc_xml = ""
     if toma is not None:
-        for tag in ("CNPJ", "CPF", "NIF"):
+        for tag in ("CNPJ", "CPF"):
             el = toma.find(f"{{*}}{tag}")
             if el is not None and el.text:
                 doc_xml = documentos.norm_documento(el.text)
                 break
-    return doc_xml == _doc(tomador)
+        el = toma.find("{*}NIF")
+        if not doc_xml and el is not None and el.text:
+            # Tomador do exterior (§22): o NIF se compara como a DPS o escreve (aparado), não
+            # normalizado como CPF/CNPJ — e nunca contra um CPF/CNPJ.
+            doc_xml = f"NIF:{el.text.strip()}"
+    return doc_xml == (_doc(tomador) or exterior.identificacao(tomador))
 
 
 class Emissor:
@@ -163,7 +168,8 @@ class Emissor:
 
     def emitir(self, *, valor: Decimal | float | int | str, descricao: str,
                tomador: dict[str, Any] | None = None,
-               numero: str | None = None, serie: str = "1") -> Nota:
+               numero: str | None = None, serie: str = "1",
+               comercio_exterior: dict[str, Any] | None = None) -> Nota:
         """Emite uma NFS-e. Pipeline (cada etapa é um módulo):
             1. montar a DPS (dps.montar_dps)        — lógica fiscal
             2. assinar (assinatura.assinar_dps)     — XMLDSIG
@@ -171,12 +177,16 @@ class Emissor:
             4. (opcional) nota.danfse(path)         — PDF local
         `valor`: Decimal (recomendado), str ("1.262,90" ou "1262.90"), int ou float.
         `numero` (nDPS): se None, usa o contador do ambiente.
+        `comercio_exterior`: o grupo comExt desta nota e a exportação (§22; ver `montar_dps`).
 
         Antes de montar a DPS, valida config + tomador (E-codes determinísticos) e
         levanta `ConfigError` — não adianta assinar/enviar uma DPS que o SEFIN vai rejeitar.
         """
         problemas = (self.cfg.validar() + validar_tomador(tomador)
-                     + validar_retencao(self.cfg, tomador))   # E0204/E0237 (§15)
+                     + validar_retencao(self.cfg, tomador)    # E0204/E0237 (§15)
+                     + exterior.validar_comercio_exterior(     # §22
+                         comercio_exterior, tomador, self.cfg.servico.tributos,
+                         self.cfg.servico.cNBS))
         if self.ambiente not in ("homologacao", "producao"):
             problemas.append(
                 f"ambiente inválido: {self.ambiente!r} (use 'homologacao' ou 'producao')"
@@ -217,7 +227,8 @@ class Emissor:
                               f"notas já emitidas — ajuste {self._contador_path()}")
 
         xml = dps.montar_dps(self.cfg, numero=numero, valor=valor, descricao=descricao,
-                             tomador=tomador, ambiente=self.ambiente, serie=serie)
+                             tomador=tomador, ambiente=self.ambiente, serie=serie,
+                             comercio_exterior=comercio_exterior)
         xml_assinado = assinatura.assinar_dps(
             xml, pkcs12_data=self._pkcs12(), senha=self.cfg.certificado.senha,
         )
