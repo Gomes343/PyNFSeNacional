@@ -112,6 +112,11 @@ ponta a ponta: **validar → montar DPS → assinar → transporte mTLS → Nota
   + `endExt` no tomador, `comercio_exterior` por nota (`serv/comExt`) e `tribISSQN=3` com
   `cPaisResult`, validados pelo Anexo I v1.01; sequência conferida contra duas notas reais do Emissor
   Web. Módulo `exterior.py`, regra em `docs/conhecimento-fiscal.md` §22, `tests/test_exterior.py`.
+- **Não publicado (24/11/2026) — locação de imóvel e virada de leiaute:** `imovel=` em `emitir`/`montar_dps`
+  monta o `IBSCBS/imovel` (locação 99.03 com copropriedade, unidades por CIB ou endereço e os ajustes da
+  base, entre eles o redutor social), com as RN do Anexo I da NT 009 (E0928–E0966, E1547) em `imovel.py`;
+  e a virada automática de leiaute (E1235 citando o `finNFSe` → a mesma DPS no outro). Regra em
+  `docs/conhecimento-fiscal.md` §19 e §23; testes `tests/test_imovel.py` e `tests/test_virada_leiaute.py`.
 - **1.8.0 (17/11/2026) — o Simples no IBS/CBS (NT 009 §2.4):** `regime.regApIBSCBSSN` e
   `servico.cAtvSN`, com as RN 313, 449 e 451–453 do Anexo VI, no leiaute `nt009-sn` (só por config;
   nos outros a DPS não muda). Regra em `docs/conhecimento-fiscal.md` §8 e §19.

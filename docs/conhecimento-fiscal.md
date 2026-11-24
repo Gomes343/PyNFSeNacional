@@ -921,3 +921,69 @@ tomador quando não vem). `tributos.tribISSQN=3` na config dá a mesma DPS que `
 Leitura única em `exterior.py`; a nota achada na SEFIN se compara pelo NIF (`"NIF:<nif>"`), nunca
 contra um CPF/CNPJ de mesmos dígitos. Testes: `tests/test_exterior.py` (os dois XSDs).
 
+
+---
+
+## 23. ★ Operação com bem imóvel e LOCAÇÃO no IBS/CBS (`IBSCBS/imovel`)
+
+Fontes: XSD da produção restrita 20/10/2026 (`TCRTCInfoImovel`) e Anexo I da produção restrita
+(`ANEXO_I-SEFIN_ADN-DPS_NFSe-SNNFSe-PRODREST-v1.01-20261020`, abas LEIAUTE e RN). Conferido em
+24/11/2026.
+
+**A classificação da locação** (tabela de vínculos da calculadora da RFB):
+
+| | Residencial | Não residencial |
+|---|---|---|
+| `cTribNac` | 99.03.01 | 99.03.01 |
+| `cNBS` | 1.1002.10.00 | 1.1002.20.00 |
+| `cIndOp` | 020201 | 020201 |
+| `CST` / `cClassTrib` | 200 / 200027 (alíquota reduzida em 70%) | 200 / 200027 |
+
+A redução de 70% vem do `cClassTrib`: a DPS não leva percentual nenhum, o SEFIN calcula. Locação de
+imóvel não é serviço da LC 116: sem ISS (`tribISSQN=4`, não incidência).
+
+**O grupo** fica no `IBSCBS`, depois do `indDest` e antes dos `valores`:
+
+```
+imovel
+  cMun                       município do imóvel (todas as unidades nele)
+  gLocacao?                  OBRIGATÓRIO no 99.03 (E0937), proibido fora dele (E0936)
+    pCopropriedade           % (100 = um locador só; 0 < p ≤ 100, E0940)
+    vTotOper                 valor TOTAL da operação (vServ = p × vTotOper, E0433)
+    vDescIncondTot? vDescCondTot?   (não cobertos pela lib)
+    dVencOrig?               vencimento original (informativo)
+  gUnidImob*  (até 99)       obrigatório com cIndOp 020101/020201/020301 (E0938)
+    inscImobFisc?            inscrição do IPTU (até 30)
+    cCIB | end               ★ ESCOLHA do XSD: o CIB (8 = 7 + DV, E0933) OU o endereço
+                             (CEP, xLgr, nro, xCpl?, xBairro?)
+    gAjusteBCLocImoveis* (até 1000) — o que sai da base do IBS/CBS (só 99.03, E0939)
+      tpAjusteBCLocImoveis   01 IPTU/tributos · 02 emolumento · 03 condomínio (os três só com a
+                             NBS da locação) · 04 REDUTOR SOCIAL (só residencial, E0944) · 99 outros
+      xTpAjusteBCLocImoveis? só no 99 (E0949) e nunca nos outros (E0954)
+      vAjusteBCLocImoveis    ≤ vTotOper (E0966); valor INTEIRO, sem a parte do coproprietário
+```
+
+O SEFIN soma os ajustes × `pCopropriedade` em `vCalcAjusteBCLocImoveis` (≤ vServ, E1547) e a base é
+`vBC = vServ − descIncond − vCalcAjusteBCLocImoveis − vISSQN` (de 2027 a 2032; em 2026 tira também
+PIS e COFINS).
+
+**O CIB não é obrigatório**: a unidade se identifica pelo endereço quando a prefeitura ainda não
+mandou o cadastro ao Sinter (as que não são capital têm até 31/12/2026). O redutor social vale do
+mesmo jeito.
+
+**Regras do grupo para qualquer serviço** (RN 603/604): com `cIndOp` de operação com imóvel
+(020101, 020201, 020202, 020301, 020401) o grupo é obrigatório (E0932); sem eles, proibido (E0928).
+Os subitens de obra (07.02.01, 07.02.02, 07.04.01, 07.05.01, 07.05.02, 07.06.01, 07.06.02,
+07.07.01, 07.08.01, 07.17.01, 07.19.01) ficam fora: a obra se identifica em `serv/obra`.
+
+**Leiaute de produção (09/02/2026):** o `imovel` é só `inscImobFisc? → cCIB | end` de UM imóvel
+(com o bairro obrigatório no endereço). Locação e ajustes não existem nele: a lib monta a unidade e
+manda ao log o que ficou de fora (2026 não se recolhe). As regras E0932/E0937/E0938 só são
+conferidas no leiaute da NT 009.
+
+**Na lib:** `Emissor.emitir(..., imovel={...})` / `montar_dps(imovel=...)`, com
+`{"codigo_municipio", "locacao": {"copropriedade", "valor_total", "vencimento_original"},
+"unidades": [{"inscricao", "cib" | "endereco", "ajustes": [{"tipo", "valor", "descricao"?}]}]}`.
+Sem `valor_total`, vale o da nota (um locador só). A lib **não calcula o redutor** (R$ 600 por
+unidade, corrigidos pelo IPCA por ato conjunto RFB/CGIBS): o valor vem de quem chama. Leitura e
+regras em `imovel.py`; testes em `tests/test_imovel.py` (os dois XSDs).

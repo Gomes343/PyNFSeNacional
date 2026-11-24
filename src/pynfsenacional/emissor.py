@@ -18,6 +18,7 @@ from lxml import etree
 
 from . import assinatura, dfe, documentos, dps, eventos, exterior, sefin
 from . import chave as _chave
+from . import imovel as _imovel
 from .certificado import Certificado
 from .config import (
     LEIAUTE_NT009,
@@ -171,7 +172,8 @@ class Emissor:
     def emitir(self, *, valor: Decimal | float | int | str, descricao: str,
                tomador: dict[str, Any] | None = None,
                numero: str | None = None, serie: str = "1",
-               comercio_exterior: dict[str, Any] | None = None) -> Nota:
+               comercio_exterior: dict[str, Any] | None = None,
+               imovel: dict[str, Any] | None = None) -> Nota:
         """Emite uma NFS-e. Pipeline (cada etapa é um módulo):
             1. montar a DPS (dps.montar_dps)        — lógica fiscal
             2. assinar (assinatura.assinar_dps)     — XMLDSIG
@@ -180,6 +182,8 @@ class Emissor:
         `valor`: Decimal (recomendado), str ("1.262,90" ou "1262.90"), int ou float.
         `numero` (nDPS): se None, usa o contador do ambiente.
         `comercio_exterior`: o grupo comExt desta nota e a exportação (§22; ver `montar_dps`).
+        `imovel`: o grupo IBSCBS/imovel desta nota — a locação 99.03 com as unidades e os
+        ajustes da base, como o redutor social (§23; ver `montar_dps`).
 
         Antes de montar a DPS, valida config + tomador (E-codes determinísticos) e
         levanta `ConfigError` — não adianta assinar/enviar uma DPS que o SEFIN vai rejeitar.
@@ -188,7 +192,10 @@ class Emissor:
                      + validar_retencao(self.cfg, tomador)    # E0204/E0237 (§15)
                      + exterior.validar_comercio_exterior(     # §22
                          comercio_exterior, tomador, self.cfg.servico.tributos,
-                         self.cfg.servico.cNBS))
+                         self.cfg.servico.cNBS)
+                     + _imovel.validar_imovel(                 # §23
+                         imovel, self.cfg.servico, valor,
+                         nt009=self._leiaute() in LEIAUTES_NT009))
         if self.ambiente not in ("homologacao", "producao"):
             problemas.append(
                 f"ambiente inválido: {self.ambiente!r} (use 'homologacao' ou 'producao')"
@@ -231,7 +238,8 @@ class Emissor:
         def enviar(leiaute: str) -> sefin.RespostaSefin:
             xml = dps.montar_dps(self.cfg, numero=numero, valor=valor, descricao=descricao,
                                  tomador=tomador, ambiente=self.ambiente, serie=serie,
-                                 comercio_exterior=comercio_exterior, leiaute=leiaute)
+                                 comercio_exterior=comercio_exterior, imovel=imovel,
+                                 leiaute=leiaute)
             xml_assinado = assinatura.assinar_dps(
                 xml, pkcs12_data=self._pkcs12(), senha=self.cfg.certificado.senha,
             )

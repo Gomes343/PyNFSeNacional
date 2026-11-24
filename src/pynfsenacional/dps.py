@@ -31,6 +31,7 @@ from typing import Any
 from lxml import etree
 
 from . import documentos, exterior
+from . import imovel as _imovel
 from .config import (
     LEIAUTE_NT009_SN,
     LEIAUTE_PRODUCAO,
@@ -180,6 +181,7 @@ def montar_dps(
     tomador: dict[str, Any] | None, ambiente: str, serie: str = "1",
     dh_emi: str | None = None, d_comp: str | None = None, ver_aplic: str | None = None,
     leiaute: str | None = None, comercio_exterior: dict[str, Any] | None = None,
+    imovel: dict[str, Any] | None = None,
 ) -> str:
     """Monta o XML da DPS (string, NÃO assinado) a partir da config + dados da emissão.
 
@@ -197,6 +199,10 @@ def montar_dps(
         (BACEN), "valor_moeda" e, com padrão, "vinculo", "mec_prestador", "mec_tomador",
         "mov_temp_bens", "mdic". Com "exportacao": True, o ISS sai tribISSQN=3 com o
         cPaisResult ("pais_resultado" ou o país do endereço do tomador). None = sem comExt.
+    `imovel` (§23): o grupo IBSCBS/imovel desta nota — "codigo_municipio" (IBGE), "locacao"
+        ("copropriedade" %, "valor_total", "vencimento_original") na locação 99.03, e
+        "unidades" (cada uma com "cib" OU "endereco", "inscricao" e os "ajustes" da base:
+        {"tipo": "04", "valor": "600.00"} = redutor social). Só entra com `servico.ibscbs`.
     """
     from . import relogio  # import tardio: relogio é infra, evita ciclo conceitual
 
@@ -405,9 +411,68 @@ def montar_dps(
     # Grupo IBS/CBS (§8): último filho do infDPS, depois de <valores>. Só a CLASSIFICAÇÃO da
     # operação — base, alíquotas e valores o SEFIN calcula. Sem `servico.ibscbs`, omitido.
     if s.ibscbs:
-        _montar_ibscbs(inf, s.ibscbs, leiaute)
+        _montar_ibscbs(inf, s.ibscbs, leiaute,
+                       imovel=_imovel.ler(imovel, valor_decimal(valor))[0] if imovel else None)
 
     return str(etree.tostring(dps, encoding="unicode"))
+
+
+def _montar_imovel(g: etree._Element, im: _imovel.Imovel, nt009: bool) -> None:
+    """IBSCBS/imovel (§23), entre o indDest (e o dest, não coberto) e os valores.
+
+    NT 009 (TCRTCInfoImovel): cMun → gLocacao?(pCopropriedade → vTotOper → dVencOrig?) →
+    gUnidImob*(inscImobFisc? → cCIB | end(CEP → xLgr → nro → xCpl? → xBairro?) →
+    gAjusteBCLocImoveis*(tpAjusteBCLocImoveis → xTpAjusteBCLocImoveis? → vAjusteBCLocImoveis)).
+    Produção (09/02/2026): inscImobFisc? → cCIB | end(CEP → xLgr → nro → xCpl? → xBairro) —
+    UM imóvel, sem locação nem ajustes; o que não cabe vai ao log (2026 não se recolhe)."""
+    if not nt009:
+        unidade, fora = _imovel.no_leiaute_de_producao(im)
+        if unidade is None:
+            _log.warning("imovel sem unidade: o leiaute de produção só o identifica pela "
+                           "unidade — grupo omitido")
+            return
+        if fora:
+            _log.warning("o leiaute de produção não tem %s — ficam fora desta DPS (§23)",
+                           ", ".join(fora))
+        _montar_unidade(_el(g, "imovel"), unidade, nt009=False)
+        return
+    el = _el(g, "imovel")
+    _el(el, "cMun", im.codigo_municipio)
+    if im.locacao is not None:
+        loc = _el(el, "gLocacao")
+        _el(loc, "pCopropriedade", f"{im.locacao.copropriedade:.2f}")
+        _el(loc, "vTotOper", f"{im.locacao.valor_total.quantize(Decimal('0.01')):.2f}")
+        if im.locacao.vencimento_original:
+            _el(loc, "dVencOrig", im.locacao.vencimento_original)
+    for u in im.unidades:
+        _montar_unidade(_el(el, "gUnidImob"), u, nt009=True)
+
+
+def _montar_unidade(el: etree._Element, u: _imovel.Unidade, *, nt009: bool) -> None:
+    if u.inscricao:
+        _el(el, "inscImobFisc", u.inscricao)
+    if u.cib:
+        _el(el, "cCIB", u.cib.upper())
+    else:
+        e = u.endereco
+        end = _el(el, "end")
+        _el(end, "CEP", e["cep"])
+        _el(end, "xLgr", e["logradouro"][:255])
+        _el(end, "nro", e["numero"][:60])
+        if e.get("complemento"):
+            _el(end, "xCpl", e["complemento"][:156])
+        if e.get("bairro") or not nt009:      # no de produção o bairro é obrigatório
+            if not e.get("bairro"):
+                raise ValueError("imovel: no leiaute de produção o endereço da unidade exige "
+                                 "o bairro")
+            _el(end, "xBairro", e["bairro"][:60])
+    if nt009:
+        for a in u.ajustes:
+            aj = _el(el, "gAjusteBCLocImoveis")
+            _el(aj, "tpAjusteBCLocImoveis", a.tipo)
+            if a.descricao:
+                _el(aj, "xTpAjusteBCLocImoveis", a.descricao[:150])
+            _el(aj, "vAjusteBCLocImoveis", f"{a.valor:.2f}")
 
 
 def _dec2(valor: Any, nome: str) -> str:
@@ -426,6 +491,7 @@ def _fin_nfse(ibs: dict[str, Any]) -> str:
 
 def _montar_ibscbs(
     inf: etree._Element, ibs: dict[str, Any], leiaute: str = LEIAUTE_PRODUCAO,
+    imovel: _imovel.Imovel | None = None,
 ) -> None:
     """Grupo IBSCBS na ordem do XSD (TCRTCInfoIBSCBS). Os opcionais não cobertos (tpOper,
     gRefNFSe, tpEnteGov, dest, imovel, cCredPres, gTribRegular, gDif) o validar() recusa.
@@ -447,6 +513,8 @@ def _montar_ibscbs(
         _el(g, "indFinal", str(ibs["indFinal"]).strip())
     _el(g, "cIndOp", obrig("cIndOp"))
     _el(g, "indDest", str(ibs.get("indDest", "0")).strip())
+    if imovel is not None:
+        _montar_imovel(g, imovel, nt009)
     trib = _el(_el(g, "valores"), "trib")
     gi = trib if nt009 else _el(trib, "gIBSCBS")
     _el(gi, "CST", obrig("CST"))
