@@ -781,9 +781,23 @@ vale. Quem diz é o **ambiente**: a produção aplica o pacote de 09/02/2026 (`n
 é **E1235** no outro.
 
 A lib escolhe pelo ambiente — homologação no `20261020`, produção no `20260209` — e a config pode
-forçar (`"leiaute": "20261020"`). Forçar serve para **a virada**: quando a produção trocar de
-pacote antes de a lib trocar o padrão. Nesse dia o SEFIN devolve E1235 citando o `finNFSe`, e a lib
-acrescenta à mensagem qual leiaute configurar.
+forçar (`"leiaute": "20261020"`).
+
+**A virada é automática (desde a 1.9.0).** O portal anunciou (29/10/2026) os releases 1 a 3 da NT 009
+em produção para **01/12/2026**. No dia em que o SEFIN trocar de pacote, a DPS no leiaute antigo volta
+**E1235 citando o `finNFSe`** (as duas mensagens, uma por sentido, estão em
+`config.leiaute_recusado`). O `Emissor.emitir` então manda **a mesma DPS** (mesmo nDPS, mesmo Id) de
+novo, no outro leiaute, **uma vez só**:
+
+- recusa de esquema não cria nota, então o reenvio não duplica nada; resposta que não veio (rede)
+  **nunca** vira, porque ali a nota pode ter nascido;
+- se o esquema passou (autorizada, ou recusada por regra de negócio), o leiaute vale a partir daí e
+  fica gravado em `<out_dir>/leiaute_<ambiente>.txt`: a próxima emissão já sai nele, sem a recusa;
+- vale nos dois sentidos (se o governo recuar, a lib volta junto);
+- leiaute **forçado** na config não vira: a mensagem só ganha a dica de qual configurar.
+
+Depois que a produção confirmar o pacote novo, o padrão do ambiente troca no código e o arquivo
+gravado deixa de importar.
 
 O que muda na DPS que esta lib monta (o resto do pacote não toca nela):
 

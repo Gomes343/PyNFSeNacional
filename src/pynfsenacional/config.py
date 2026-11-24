@@ -60,6 +60,21 @@ def leiaute_do_ambiente(ambiente: str) -> str:
     return _LEIAUTE_DO_AMBIENTE.get(ambiente, LEIAUTE_PRODUCAO)
 
 
+def leiaute_recusado(codigo: str | None, msg: str | None) -> bool:
+    """A recusa diz que o SEFIN aplica o OUTRO pacote do XSD (§19)? É o E1235 que cita o
+    `finNFSe` — o elemento que muda de lugar entre os dois: obrigatório no `infDPS` da NT 009,
+    inexistente ali no de produção. Medido nos dois sentidos (homologação, 31/10/2026):
+    leiaute antigo num SEFIN da NT 009 → "invalid child element 'cLocEmi' … expected
+    'cMotivoEmisTI, finNFSe'"; o contrário → "invalid child element 'finNFSe'". Recusa de
+    esquema não cria nota: mandar de novo, no outro leiaute, não duplica nada."""
+    return codigo == "E1235" and bool(msg) and "finNFSe" in (msg or "")
+
+
+def outro_leiaute(leiaute: str) -> str:
+    """O pacote para onde a virada vai: da NT 009 volta ao de produção, e vice-versa."""
+    return LEIAUTE_PRODUCAO if leiaute in LEIAUTES_NT009 else LEIAUTE_NT009
+
+
 # CST do PIS/COFINS que dispensam o tipo de retenção (E0698): Nenhum, sem incidência, suspensão.
 _CST_SEM_TPRET = ("00", "08", "09")
 

@@ -160,7 +160,8 @@ release por tag `vX.Y.Z` (PyPI via Trusted Publishing + Release do GitHub, sem t
 só por config, com XSD de teste NÃO oficial em `tests/xsd/nt009-sn/`); falta o pacote oficial de
 esquemas (trocar a pasta e dar ao leiaute a data dele), o optante pendente (`opSimpNac=4`) e os casos
 não cobertos do grupo; (3) reportar o classifier de licença errado upstream; (4) trocar o
-leiaute padrão da produção quando ela virar para o pacote da NT 009; (5) evento de substituição.
+leiaute padrão da produção quando ela virar para o pacote da NT 009 (até lá a virada é
+automática: E1235 citando o `finNFSe` → a mesma DPS no outro leiaute, §19); (5) evento de substituição.
 
 Tooling: `pip install -e ".[dev]"` (deps instalam no 3.10–3.14), lock com hashes
 (`requirements-dev.txt`), CI (`.github/workflows/ci.yml`), release por tag (`release.yml`).

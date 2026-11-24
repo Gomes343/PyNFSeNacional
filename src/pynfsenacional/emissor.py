@@ -27,6 +27,8 @@ from .config import (
     ClienteConfig,
     ConfigError,
     leiaute_do_ambiente,
+    leiaute_recusado,
+    outro_leiaute,
     validar_retencao,
     validar_tomador,
 )
@@ -226,13 +228,31 @@ class Emissor:
             raise ConfigError(f"o contador de nDPS está {MAX_NUMEROS_PULADOS}+ números atrás das "
                               f"notas já emitidas — ajuste {self._contador_path()}")
 
-        xml = dps.montar_dps(self.cfg, numero=numero, valor=valor, descricao=descricao,
-                             tomador=tomador, ambiente=self.ambiente, serie=serie,
-                             comercio_exterior=comercio_exterior)
-        xml_assinado = assinatura.assinar_dps(
-            xml, pkcs12_data=self._pkcs12(), senha=self.cfg.certificado.senha,
-        )
-        resp = cliente.emitir(xml_assinado)
+        def enviar(leiaute: str) -> sefin.RespostaSefin:
+            xml = dps.montar_dps(self.cfg, numero=numero, valor=valor, descricao=descricao,
+                                 tomador=tomador, ambiente=self.ambiente, serie=serie,
+                                 comercio_exterior=comercio_exterior, leiaute=leiaute)
+            xml_assinado = assinatura.assinar_dps(
+                xml, pkcs12_data=self._pkcs12(), senha=self.cfg.certificado.senha,
+            )
+            return cliente.emitir(xml_assinado)
+
+        leiaute = self._leiaute()
+        resp = enviar(leiaute)
+        # A VIRADA DE LEIAUTE (§19): o SEFIN trocou de pacote do XSD antes da lib. A recusa de
+        # esquema não cria nota, então a mesma DPS (mesmo nDPS, mesmo Id) vai de novo no outro
+        # leiaute — uma vez só. Leiaute forçado na config não vira: quem forçou decide.
+        if not resp.ok and not self.cfg.leiaute and leiaute_recusado(resp.erro_codigo,
+                                                                     resp.erro_msg):
+            outro = outro_leiaute(leiaute)
+            logger.warning("idDps=%s: o SEFIN de %s recusou o leiaute %s (E1235 citando o "
+                           "finNFSe) — reenviando no %s", idd, self.ambiente, leiaute, outro)
+            segunda = enviar(outro)
+            if segunda.ok or not leiaute_recusado(segunda.erro_codigo, segunda.erro_msg):
+                # O esquema passou (mesmo que uma regra de negócio recuse a nota): é ele que o
+                # SEFIN aplica agora. As próximas emissões já saem nele.
+                self._gravar_leiaute(outro)
+                resp, leiaute = segunda, outro
 
         if resp.ok:                       # incrementa o contador SÓ após emissão confirmada
             self._commit_numero(numero)
@@ -251,7 +271,7 @@ class Emissor:
             id_dps=idd,
             erro_msg=_dica_leiaute(
                 f"[{resp.erro_codigo}] {resp.erro_msg}" if resp.erro_codigo else resp.erro_msg,
-                resp.erro_codigo, self.cfg.leiaute or leiaute_do_ambiente(self.ambiente)),
+                resp.erro_codigo, leiaute),
             erros=resp.erros,
             alertas=resp.alertas,
         )
@@ -381,6 +401,34 @@ class Emissor:
         except Exception as e:  # noqa: BLE001
             logger.warning("nota %s existe, mas o XML não veio: %s", chave, e)
             return None
+
+    def _leiaute_path(self) -> Path:
+        return self.out_dir / f"leiaute_{self.ambiente}.txt"
+
+    def _leiaute(self) -> str:
+        """O leiaute desta emissão (§19): o que a config força; senão o que a última virada
+        provou (gravado no `out_dir`); senão o padrão do ambiente."""
+        if self.cfg.leiaute:
+            return self.cfg.leiaute
+        try:
+            visto = self._leiaute_path().read_text(encoding="utf-8").strip()
+        except OSError:
+            visto = ""
+        if visto in (LEIAUTE_PRODUCAO, LEIAUTE_NT009):
+            return visto
+        return leiaute_do_ambiente(self.ambiente)
+
+    def _gravar_leiaute(self, leiaute: str) -> None:
+        """Guarda o leiaute que o SEFIN aceitou. Melhor esforço: sem gravar, a próxima emissão
+        só paga de novo uma recusa de esquema antes de sair."""
+        try:
+            self.out_dir.mkdir(parents=True, exist_ok=True)
+            tmp = self._leiaute_path().with_suffix(".tmp")
+            tmp.write_text(leiaute, encoding="utf-8")
+            tmp.replace(self._leiaute_path())
+        except OSError as e:
+            logger.warning("não consegui gravar o leiaute %s em %s: %s", leiaute,
+                           self._leiaute_path(), e)
 
     def _contador_path(self) -> Path:
         return self.out_dir / f"numero_{self.cfg.id}_{self.ambiente}.txt"
