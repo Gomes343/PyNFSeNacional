@@ -987,3 +987,18 @@ conferidas no leiaute da NT 009.
 Sem `valor_total`, vale o da nota (um locador só). A lib **não calcula o redutor** (R$ 600 por
 unidade, corrigidos pelo IPCA por ato conjunto RFB/CGIBS): o valor vem de quem chama. Leitura e
 regras em `imovel.py`; testes em `tests/test_imovel.py` (os dois XSDs).
+
+**Validado ao vivo em homologação (24/11/2026)**, ME/EPP de São Paulo: aluguel residencial de
+R$ 1.500,00 (99.03.01, NBS 1.1002.10.00, cIndOp 020201, CST 200, cClassTrib 200027), uma unidade
+pelo ENDEREÇO (sem CIB) com redutor social de R$ 600,00 (04) e IPTU de R$ 100,00 (01). Autorizada;
+o SEFIN devolveu `vCalcAjusteBCLocImoveis = 700.00`, `vBC = 800.00` e `pRedAliq* = 70.00`.
+Cancelada em seguida.
+
+> ☠️ **Município que não aderiu ao emissor nacional (E0039).** A RN 171 da produção restrita exige
+> que o município do emitente use os emissores públicos nacionais (`aderenteEmissorNacional = 1`
+> em `consultar_convenio`), com exceção só do MEI e do ME/EPP do Simples (competência a partir de
+> 01/11/2026). Medido em 24/11/2026: uma PJ do **Lucro Presumido** de município com
+> `aderenteEmissorNacional = 0` toma **E0039** na locação. E a RN 336 (E0309) proíbe o município
+> de compartilhar nota 99.03 do sistema próprio. Fontes secundárias citam a NT 007 dizendo que o
+> item 99 sai pela Sefin Nacional "mesmo sem adesão do município", mas a homologação ainda não
+> aplica essa exceção. Conferir o convênio ANTES de prometer a nota.
