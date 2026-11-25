@@ -31,6 +31,11 @@ robô de navegador nem da API de PDF do governo.
 > testes** até a produção virar de pacote; até lá a produção segue no leiaute atual, sem mudar um
 > byte, e a lib escolhe sozinha pelo ambiente. Detalhes em
 > [`docs/conhecimento-fiscal.md` §19](docs/conhecimento-fiscal.md).
+>
+> 🔀 **Pronta para 01/12/2026 (v1.9.0).** Os releases 1 a 3 da NT 009 estão anunciados para a
+> produção nessa data. Se o SEFIN trocar de pacote, a lib percebe a recusa de esquema e manda a mesma
+> DPS no leiaute novo, uma vez só e sem duplicar nota. A 1.9.0 traz também a **locação de imóvel**
+> no IBS/CBS (redutor social, IPTU, condomínio) e o **tomador no exterior**.
 
 ---
 
@@ -60,6 +65,11 @@ adicionando o que faltava (o transporte ao SEFIN nacional + o acabamento).
 - ✅ **Validação fiscal antes de enviar** — pega E0312/E0712/E1235… e CPF/CNPJ (mód-11) localmente.
 - 🔁 **Idempotência nativa** (`verificarDps`) — não duplica nota num reenvio, e a nota recuperada
   volta com o XML (dá para gerar o DANFSe).
+- 🔀 **Virada de leiaute automática**: no dia em que o SEFIN trocar o pacote de esquemas, a mesma
+  DPS vai no leiaute novo, uma vez só, sem duplicar nota.
+- 🏠 **Locação de imóvel no IBS/CBS** (NT 009): unidades por CIB ou endereço, redutor social, IPTU
+  e condomínio fora da base.
+- 🌎 **Tomador no exterior** e **exportação de serviço** (`comExt`).
 - ❌ **Cancelamento** direto (e101101) ou por análise fiscal (e101103), para os municípios que não
   aceitam o direto.
 - 🔎 **Consulta pela chave** e 📬 **caixa postal DF-e**: as notas emitidas, as recebidas como
@@ -130,6 +140,28 @@ for doc in caixa.documentos:
     print(doc.nsu, doc.classificar(emissor.cfg.prestador.cnpj), doc.nome_arquivo())
     doc.gravar("caixa/")                            # bytes do XML, gravação atômica
 proximo_nsu = caixa.ultimo_nsu                      # guarde: a próxima leitura parte daqui
+```
+
+Locação de imóvel (IBS/CBS, NT 009 — config com `cTribNac` 99.03.01, NBS 1.1002.10.00,
+`cIndOp` 020201, CST 200 e `cClassTrib` 200027):
+
+```python
+nota = emissor.emitir(
+    valor=Decimal("1500.00"),
+    descricao="Aluguel de novembro",
+    tomador={"cpf_cnpj": "00000000000", "nome": "Fulano de Tal"},
+    imovel={
+        "codigo_municipio": "3550308",
+        "locacao": {"copropriedade": "100"},          # um locador só; total = valor da nota
+        "unidades": [{
+            "endereco": {"cep": "01001000", "logradouro": "Praça da Sé", "numero": "1",
+                         "bairro": "Sé"},             # ou "cib": "..." quando a prefeitura já tiver
+            "ajustes": [{"tipo": "04", "valor": "600.00"},   # redutor social
+                        {"tipo": "01", "valor": "100.00"}],  # IPTU
+        }],
+    },
+)
+# o SEFIN calcula: base 800,00 e alíquota reduzida em 70% (§23)
 ```
 
 ### Pela linha de comando
@@ -303,7 +335,13 @@ config (JSON)  →  montar DPS (XML)  →  assinar (XMLDSIG)  →  gzip+base64 �
   nº 4/2026 e nº 7/2026)
 - ⏳ Optante pendente (`opSimpNac=4`) e os casos ainda não cobertos do grupo: destinatário ≠
   adquirente, compra governamental
-- ⏳ Tomador estrangeiro / sem documento
+- ✅ **Tomador no exterior** (NIF ou motivo, `endExt`) e **exportação de serviço** (`comExt`,
+  `cPaisResult`) — v1.9.0
+- ✅ **Locação de imóvel no IBS/CBS** (`IBSCBS/imovel`: unidades por CIB ou endereço, redutor
+  social e ajustes da base, regras do Anexo I) — autorizada em homologação, v1.9.0
+- ✅ **Virada automática de leiaute** (E1235 citando o `finNFSe` → a mesma DPS no outro pacote),
+  para a NT 009 em produção a partir de 01/12/2026 — v1.9.0
+- ⏳ Descontos da locação (`vDescIncondTot`/`vDescCondTot`)
 - ✅ **Cancelamento** (e101101 direto / e101103 análise fiscal), **consulta pela chave** e
   **distribuição DF-e** por NSU; valor em `Decimal`; certificado do servidor conferido — v1.2.0
 - ⏳ Evento de **substituição** (e105102) e manifestação do tomador

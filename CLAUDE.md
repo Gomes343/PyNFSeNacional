@@ -108,11 +108,11 @@ ponta a ponta: **validar → montar DPS → assinar → transporte mTLS → Nota
   e `Emissor.sincronizar_dfe` (`dfe.py`, caixa postal do ADN por NSU). Validados ao vivo em
   homologação. O contador de nDPS deixou de travar no `ja_emitida` (compara valor + tomador da
   nota achada) e o valor passou a `Decimal`. Regra em `docs/conhecimento-fiscal.md` §5, §16–§18.
-- **Não publicado (19/11/2026) — tomador no exterior e exportação de serviço:** `nif`/`motivo_sem_nif`
+- **1.9.0 (25/11/2026) — tomador no exterior e exportação de serviço:** `nif`/`motivo_sem_nif`
   + `endExt` no tomador, `comercio_exterior` por nota (`serv/comExt`) e `tribISSQN=3` com
   `cPaisResult`, validados pelo Anexo I v1.01; sequência conferida contra duas notas reais do Emissor
   Web. Módulo `exterior.py`, regra em `docs/conhecimento-fiscal.md` §22, `tests/test_exterior.py`.
-- **Não publicado (24/11/2026) — locação de imóvel e virada de leiaute:** `imovel=` em `emitir`/`montar_dps`
+- **1.9.0 (25/11/2026, preparação para a NT 009 em produção em 01/12) — locação de imóvel e virada de leiaute:** `imovel=` em `emitir`/`montar_dps`
   monta o `IBSCBS/imovel` (locação 99.03 com copropriedade, unidades por CIB ou endereço e os ajustes da
   base, entre eles o redutor social), com as RN do Anexo I da NT 009 (E0928–E0966, E1547) em `imovel.py`;
   e a virada automática de leiaute (E1235 citando o `finNFSe` → a mesma DPS no outro). Regra em

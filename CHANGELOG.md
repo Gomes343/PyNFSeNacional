@@ -5,19 +5,51 @@ versionamento [SemVer](https://semver.org/lang/pt-BR/).
 
 ## [Não publicado]
 
+## [1.9.0] - 2026-11-25
+
+Preparação para **dezembro de 2026**, continuação da NT 009. O portal anunciou os releases 1 a 3 da
+NT 009 em produção para **01/12/2026**: a partir desse dia o SEFIN pode trocar de pacote de esquemas
+sem aviso na hora. Esta versão deixa a emissão pronta para essa virada (ela troca de leiaute sozinha,
+sem duplicar nota) e traz os grupos da NT 009 que faltavam: a **locação de imóvel** no IBS/CBS, com o
+redutor social e os ajustes da base, e o **tomador no exterior** com a exportação de serviço. Sem os
+dados novos, a DPS sai idêntica à da 1.8.0, byte a byte.
+
 ### Adicionado
+- **Virada automática de leiaute (§19).** Quando o SEFIN recusa a DPS com **E1235 citando o
+  `finNFSe`** (o sinal de que o ambiente aplica o outro pacote de esquemas), `Emissor.emitir` manda
+  a **mesma DPS** (mesmo nDPS, mesmo Id) no outro leiaute, **uma vez só**. Recusa de esquema não cria
+  nota, então o reenvio não duplica nada; falha de rede **nunca** vira, porque ali a nota pode ter
+  nascido. O leiaute que passou fica gravado em `out_dir/leiaute_<ambiente>.txt` e vale para as
+  notas seguintes; leiaute forçado na config nunca vira. `config.leiaute_recusado` e
+  `config.outro_leiaute` públicos.
+- **Locação de imóvel no IBS/CBS (§23).** `Emissor.emitir(..., imovel={...})` e
+  `montar_dps(imovel=...)` montam o grupo `IBSCBS/imovel` da NT 009: município do imóvel, `gLocacao`
+  (copropriedade, valor total da operação, vencimento original), até 99 unidades identificadas pelo
+  **CIB ou pelo endereço** (o CIB não é obrigatório) e, em cada uma, os ajustes da base
+  (`gAjusteBCLocImoveis`): **01** IPTU, **02** emolumentos, **03** condomínio, **04 redutor social**
+  (só na locação residencial) e **99** outros com descrição. Validação local pelas regras do Anexo I
+  (E0433, E0902, E0928, E0929, E0932, E0933, E0936–E0940, E0944, E0949, E0954, E0966, E1547).
+  Autorizada em homologação: aluguel de R$ 1.500,00 com redutor de R$ 600,00 e IPTU de R$ 100,00
+  → `vBC = 800,00` e redução de 70% (`cClassTrib 200027`). No leiaute de produção sai a unidade só
+  (o que ele não comporta vai ao log). A lib não calcula o redutor: o valor vem de quem chama.
+  Módulo novo `imovel`.
 - **Tomador no exterior e exportação de serviço (§22).** O tomador se identifica por `nif` ou
   `motivo_sem_nif` (1 dispensado, 2 não exigido) com o endereço no exterior (`endExt`); a nota leva
   `comercio_exterior` (grupo `serv/comExt`: modo de prestação, moeda BACEN e valor nela, com os
   padrões do Emissor Web) e, com `exportacao=True` ou `tributos.tribISSQN=3`, o ISS sai como
   exportação com o `cPaisResult`. Validação pelas regras do Anexo I v1.01 (E0226, E0233, E0242,
   E0318, E0330, E0333, E0341, E0343, E0345, E0352, E0354, E0356, E0590). `Emissor.emitir` e
-  `montar_dps` ganham o parâmetro `comercio_exterior`; módulo novo `exterior`. Sem esses dados a DPS
-  sai idêntica, byte a byte.
+  `montar_dps` ganham o parâmetro `comercio_exterior`; módulo novo `exterior`.
 
 ### Mudado
 - `mesma_nota` compara o tomador do exterior pelo NIF. Até aqui o tomador só com NIF saía sem
   `<toma>`, e uma nota sem tomador contava como a dele.
+
+### Limitações conhecidas
+- Município que não aderiu ao emissor nacional (`aderenteEmissorNacional = 0`): a homologação
+  recusa a PJ do Regime Regular com **E0039** (RN 171), inclusive na locação. Não é a lib: a
+  exceção do item 99 anunciada na NT 007 ainda não é aplicada pelo ambiente (§23).
+- Descontos da locação (`vDescIncondTot`/`vDescCondTot`) ainda não cobertos.
 
 ## [1.8.0] - 2026-11-17
 
